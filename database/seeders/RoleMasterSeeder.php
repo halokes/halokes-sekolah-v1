@@ -18,6 +18,10 @@ class RoleMasterSeeder extends Seeder
             ['role_name' => 'Operator', 'role_code' => 'ROLE_OPERATOR'],
             ['role_name' => 'Supervisor', 'role_code' => 'ROLE_SUPERVISOR'],
             ['role_name' => 'Administrator', 'role_code' => 'ROLE_ADMIN'],
+            ['role_name' => 'Superintendent', 'role_code' => 'ROLE_SUPERINTENDENT'],
+            ['role_name' => 'Teacher', 'role_code' => 'ROLE_TEACHER'],
+            ['role_name' => 'Student', 'role_code' => 'ROLE_STUDENT'],
+            ['role_name' => 'Parent', 'role_code' => 'ROLE_PARENT'],
         ];
 
         DB::table('role_master')->insert($roles);

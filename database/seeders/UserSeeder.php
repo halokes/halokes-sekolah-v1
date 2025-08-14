@@ -22,7 +22,7 @@ class UserSeeder extends Seeder
             [
                 'id' => Str::uuid(),
                 'name' => 'Super Admin',
-                'email' => 'superadmin@samboilerplate.com',
+                'email' => 'superadmin@halokes.id',
                 'password' => Hash::make('password123'),
                 'is_active' => true,
                 'email_verified_at' => Carbon::now(),
@@ -33,7 +33,7 @@ class UserSeeder extends Seeder
             [
                 'id' => Str::uuid(),
                 'name' => 'Pak Bon Admin',
-                'email' => 'admin@samboilerplate.com',
+                'email' => 'admin@halokes.id',
                 'password' => Hash::make('password123'),
                 'is_active' => true,
                 'email_verified_at' => Carbon::now(),
@@ -44,7 +44,7 @@ class UserSeeder extends Seeder
             [
                 'id' => Str::uuid(),
                 'name' => 'Si Tegar Supervisor',
-                'email' => 'supervisor@samboilerplate.com',
+                'email' => 'supervisor@halokes.id',
                 'password' => Hash::make('password123'),
                 'is_active' => true,
                 'email_verified_at' => Carbon::now(),
@@ -55,7 +55,7 @@ class UserSeeder extends Seeder
             [
                 'id' => Str::uuid(),
                 'name' => 'Sam Didi Operator',
-                'email' => 'operator@samboilerplate.com',
+                'email' => 'operator@halokes.id',
                 'password' => Hash::make('password123'),
                 'is_active' => true,
                 'email_verified_at' => Carbon::now(),
@@ -66,7 +66,7 @@ class UserSeeder extends Seeder
             [
                 'id' => Str::uuid(),
                 'name' => 'Sam Toni User',
-                'email' => 'user@samboilerplate.com',
+                'email' => 'user@halokes.id',
                 'password' => Hash::make('password123'),
                 'is_active' => true,
                 'email_verified_at' => Carbon::now(),

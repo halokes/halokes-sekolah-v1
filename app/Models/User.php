@@ -84,6 +84,144 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(UserProfile::class);
     }
 
+    // Student relationships
+    public function enrollments()
+    {
+        return $this->hasMany(Enrollment::class, 'student_id');
+    }
+
+    public function attendances()
+    {
+        return $this->hasManyThrough(Attendance::class, Enrollment::class, 'student_id', 'enrollment_id');
+    }
+
+    public function grades()
+    {
+        return $this->hasManyThrough(Grade::class, Enrollment::class, 'student_id', 'enrollment_id');
+    }
+
+    public function submissions()
+    {
+        return $this->hasMany(Submission::class, 'student_id');
+    }
+
+    public function parentStudents()
+    {
+        return $this->hasMany(ParentStudent::class, 'student_id');
+    }
+
+    // Teacher relationships
+    public function teacherSubjects()
+    {
+        return $this->hasMany(TeacherSubject::class, 'teacher_id');
+    }
+
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class, 'teacher_id');
+    }
+
+    public function assignedGrades()
+    {
+        return $this->hasMany(Grade::class, 'teacher_id');
+    }
+
+    public function createdAssignments()
+    {
+        return $this->hasMany(Assignment::class, 'teacher_id');
+    }
+
+    public function gradedSubmissions()
+    {
+        return $this->hasMany(Submission::class, 'graded_by');
+    }
+
+    // Parent relationships
+    public function parentStudentsAsParent()
+    {
+        return $this->hasMany(ParentStudent::class, 'parent_id');
+    }
+
+    public function students()
+    {
+        return $this->belongsToMany(User::class, 'parent_students', 'parent_id', 'student_id');
+    }
+
+    // Superintendent/Admin relationships
+    public function schools()
+    {
+        return $this->belongsToMany(School::class, 'user_profiles', 'user_id', 'school_id');
+    }
+
+    public function announcements()
+    {
+        return $this->hasMany(Announcement::class, 'sender_id');
+    }
+
+    // Helper methods for user roles
+    public function isStudent()
+    {
+        return $this->hasRole('ROLE_STUDENT') || $this->enrollments()->exists();
+    }
+
+    public function isTeacher()
+    {
+        return $this->hasRole('ROLE_TEACHER') || $this->teacherSubjects()->exists();
+    }
+
+    public function isParent()
+    {
+        return $this->hasRole('ROLE_PARENT') || $this->parentStudentsAsParent()->exists();
+    }
+
+    public function isSuperintendent()
+    {
+        return $this->hasRole('ROLE_SUPERINTENDENT');
+    }
+
+    public function getStudentClassesAttribute()
+    {
+        if (!$this->isStudent()) {
+            return collect();
+        }
+
+        return $this->enrollments()->with('class')->get()->pluck('class');
+    }
+
+    public function getTeacherClassesAttribute()
+    {
+        if (!$this->isTeacher()) {
+            return collect();
+        }
+
+        return $this->teacherSubjects()->with('class')->get()->pluck('class')->unique();
+    }
+
+    public function getParentStudentsAttribute()
+    {
+        if (!$this->isParent()) {
+            return collect();
+        }
+
+        return $this->parentStudentsAsParent()->with('student')->get();
+    }
+
+    public function getCurrentAcademicYearAttribute()
+    {
+        return AcademicYear::current()->first();
+    }
+
+    public function getCurrentEnrollmentsAttribute()
+    {
+        if (!$this->isStudent()) {
+            return collect();
+        }
+
+        return $this->enrollments()->active()
+            ->where('academic_year_id', $this->current_academic_year->id ?? null)
+            ->get();
+    }
+
     public function listRoles()
     {
         return $this->roles()->pluck('role_name');

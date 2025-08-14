@@ -423,7 +423,7 @@ class UserControllerTest extends TestCase
 
         $payloadUpdatedUser = [
             'name' => 'UPDATED USER',
-            'email' => 'updateduser@samboilerplate.com',
+            'email' => 'updateduser@halokes.id',
             'phone_number' => '081234567890',
             'roles' => $rolesArrayId,
             'is_active' => false,
@@ -453,7 +453,7 @@ class UserControllerTest extends TestCase
         //ACT 2
         $payloadUpdatedUserFailed = [
             'name' => 'UPDATED USER',
-            'email' => 'updateduser@samboilerplate.com',
+            'email' => 'updateduser@halokes.id',
             'phone_number' => '081234567890',
             'roles' => null,
             'is_active' => false,

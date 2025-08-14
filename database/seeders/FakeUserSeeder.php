@@ -23,7 +23,7 @@ class FakeUserSeeder extends Seeder
         $faker = Faker::create('id_ID'); // Use 'id_ID' for Indonesian locale
 
         for ($i = 0; $i < 25; $i++) {
-          
+
              // Generate a name
             $name = $faker->name();
 
@@ -31,7 +31,7 @@ class FakeUserSeeder extends Seeder
             $emailName = strtolower(str_replace(' ', '.', preg_replace('/[^a-zA-Z\s]/', '', $name)));
 
             // Combine with a domain to create the email
-            $email = $emailName . '@samboilerplate.com';
+            $email = $emailName . '@halokes.id';
 
             $user = User::create([
                  'name' => $name,

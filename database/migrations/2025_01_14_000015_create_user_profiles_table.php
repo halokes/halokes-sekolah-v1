@@ -21,7 +21,6 @@ return new class extends Migration
             $table->uuid('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
 
-
             // Nullable profile columns
             $table->date('date_of_birth')->nullable()->default(null);
             $table->enum('gender', ['male', 'female'])->nullable()->default(null);
@@ -30,6 +29,20 @@ return new class extends Migration
             $table->string('country')->nullable()->default(null);
             $table->string('profile_picture')->nullable()->default(null);
 
+            // School-specific fields
+            $table->uuid('school_id')->nullable();
+            $table->string('employee_id')->nullable();
+            $table->string('student_id')->nullable();
+            $table->string('nisn')->nullable();
+            $table->string('nik')->nullable();
+            $table->string('phone_number')->nullable();
+            $table->string('emergency_contact')->nullable();
+            $table->string('emergency_phone')->nullable();
+            $table->text('education_background')->nullable();
+            $table->text('work_experience')->nullable();
+            $table->text('skills')->nullable();
+            $table->string('status')->default('active'); // active, inactive, suspended, graduated
+
             //used for auditing
             $table->string('created_by')->nullable()->default(null);
             $table->string('updated_by')->nullable()->default(null);
@@ -37,6 +50,9 @@ return new class extends Migration
             // Add soft deletes and timestamps
             $table->softDeletes();
             $table->timestamps();
+
+            // Add foreign key for school
+            $table->foreign('school_id')->references('id')->on('schools')->onDelete('set null');
         });
     }
 

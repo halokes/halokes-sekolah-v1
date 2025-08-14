@@ -21,11 +21,11 @@ class RoleUserSeeder extends Seeder
          $roleIdSupervisor = DB::table('role_master')->where('role_code', 'ROLE_SUPERVISOR')->value('id');// Assign roles to users
 
          //find the id of the users
-         $userIdSuperAdmin  = DB::table('users')->where('email', 'superadmin@samboilerplate.com')->value('id');
-         $userIdUser        = DB::table('users')->where('email', 'user@samboilerplate.com')->value('id');
-         $userIdAdmin       = DB::table('users')->where('email', 'admin@samboilerplate.com')->value('id');
-         $userIdOperator    = DB::table('users')->where('email', 'operator@samboilerplate.com')->value('id');
-         $userIdSupervisor  = DB::table('users')->where('email', 'supervisor@samboilerplate.com')->value('id');
+         $userIdSuperAdmin  = DB::table('users')->where('email', 'superadmin@halokes.id')->value('id');
+         $userIdUser        = DB::table('users')->where('email', 'user@halokes.id')->value('id');
+         $userIdAdmin       = DB::table('users')->where('email', 'admin@halokes.id')->value('id');
+         $userIdOperator    = DB::table('users')->where('email', 'operator@halokes.id')->value('id');
+         $userIdSupervisor  = DB::table('users')->where('email', 'supervisor@halokes.id')->value('id');
 
 
 

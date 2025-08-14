@@ -25,6 +25,12 @@ class DatabaseSeeder extends Seeder
             SubscriptionMasterSeeder::class,
             SubscriptionUserSeeder::class,
             SubscriptionHistorySeeder::class,
+
+            // Academic related
+            SchoolLevelSeeder::class,
+            SchoolSeeder::class,
+            SubjectSeeder::class,
+            ClassSeeder::class,
         ]);
     }
 }

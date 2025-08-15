@@ -28,6 +28,8 @@ return new class extends Migration
             $table->dateTime('expire_at')->nullable();
             $table->boolean('is_published')->default(false);
             $table->boolean('is_sent_to_parents')->default(false);
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

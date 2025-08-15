@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ParentStudent extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'parent_students';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'parent_id',
@@ -18,52 +22,22 @@ class ParentStudent extends Model
         'guardian_type',
         'is_primary',
         'notes',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
         'is_primary' => 'boolean',
     ];
 
-    // Constants
-    const RELATIONSHIP_FATHER = 'father';
-    const RELATIONSHIP_MOTHER = 'mother';
-    const RELATIONSHIP_GUARDIAN = 'guardian';
-    const RELATIONSHIP_GRANDFATHER = 'grandfather';
-    const RELATIONSHIP_GRANDMOTHER = 'grandmother';
-    const RELATIONSHIP_UNCLE = 'uncle';
-    const RELATIONSHIP_AUNT = 'aunt';
-    const RELATIONSHIP_BROTHER = 'brother';
-    const RELATIONSHIP_SISTER = 'sister';
-    const RELATIONSHIP_OTHER = 'other';
-
-    const GUARDIAN_TYPE_BIOLOGICAL = 'biological';
-    const GUARDIAN_TYPE_ADOPTIVE = 'adoptive';
-    const GUARDIAN_TYPE_FOSTER = 'foster';
-    const GUARDIAN_TYPE_OTHER = 'other';
-
-    // Relationships
-    public function parent()
+    public function parent(): BelongsTo
     {
         return $this->belongsTo(User::class, 'parent_id');
     }
 
-    public function student()
+    public function student(): BelongsTo
     {
         return $this->belongsTo(User::class, 'student_id');
-    }
-
-    // Scopes
-    public function scopePrimary($query)
-    {
-        return $query->where('is_primary', true);
-    }
-
-    public function scopeSecondary($query)
-    {
-        return $query->where('is_primary', false);
     }
 
     public function scopeForParent($query, $parentId)
@@ -81,105 +55,76 @@ class ParentStudent extends Model
         return $query->where('relationship', $relationship);
     }
 
-    // Accessors
-    public function getRelationshipLabelAttribute()
+    public function scopeGuardianType($query, $guardianType)
     {
-        return self::getRelationships()[$this->relationship] ?? $this->relationship;
+        return $query->where('guardian_type', $guardianType);
     }
 
-    public function getGuardianTypeLabelAttribute()
+    public function scopePrimary($query)
     {
-        return self::getGuardianTypes()[$this->guardian_type] ?? $this->guardian_type;
+        return $query->where('is_primary', true);
     }
 
-    public function getIsPrimaryGuardianAttribute()
+    public function scopeSearch($query, $keyword)
     {
-        return $this->is_primary;
+        return $query->where(function ($q) use ($keyword) {
+            $q->whereHas('parent', function ($parentQuery) use ($keyword) {
+                $parentQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('email', 'like', '%' . $keyword . '%');
+            })->orWhereHas('student', function ($studentQuery) use ($keyword) {
+                $studentQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('email', 'like', '%' . $keyword . '%');
+            })->orWhere('relationship', 'like', '%' . $keyword . '%')
+              ->orWhere('guardian_type', 'like', '%' . $keyword . '%')
+              ->orWhere('notes', 'like', '%' . $keyword . '%');
+        });
     }
 
-    // Mutators
-    public function setRelationshipAttribute($value)
+    /**
+     * Get the relationship name in a more readable format
+     */
+    public function getRelationshipNameAttribute()
     {
-        $this->attributes['relationship'] = strtolower($value);
-    }
-
-    public function setGuardianTypeAttribute($value)
-    {
-        $this->attributes['guardian_type'] = strtolower($value);
-    }
-
-    // Helper methods
-    public static function getRelationships()
-    {
-        return [
-            self::RELATIONSHIP_FATHER => 'Father',
-            self::RELATIONSHIP_MOTHER => 'Mother',
-            self::RELATIONSHIP_GUARDIAN => 'Guardian',
-            self::RELATIONSHIP_GRANDFATHER => 'Grandfather',
-            self::RELATIONSHIP_GRANDMOTHER => 'Grandmother',
-            self::RELATIONSHIP_UNCLE => 'Uncle',
-            self::RELATIONSHIP_AUNT => 'Aunt',
-            self::RELATIONSHIP_BROTHER => 'Brother',
-            self::RELATIONSHIP_SISTER => 'Sister',
-            self::RELATIONSHIP_OTHER => 'Other',
+        $relationships = [
+            'father' => 'Father',
+            'mother' => 'Mother',
+            'guardian' => 'Guardian',
+            'uncle' => 'Uncle',
+            'aunt' => 'Aunt',
+            'other' => 'Other'
         ];
+
+        return $relationships[$this->relationship] ?? ucfirst($this->relationship);
     }
 
-    public static function getGuardianTypes()
+    /**
+     * Get the guardian type name in a more readable format
+     */
+    public function getGuardianTypeNameAttribute()
     {
-        return [
-            self::GUARDIAN_TYPE_BIOLOGICAL => 'Biological',
-            self::GUARDIAN_TYPE_ADOPTIVE => 'Adoptive',
-            self::GUARDIAN_TYPE_FOSTER => 'Foster',
-            self::GUARDIAN_TYPE_OTHER => 'Other',
+        $types = [
+            'biological' => 'Biological',
+            'adoptive' => 'Adoptive',
+            'foster' => 'Foster',
+            'other' => 'Other'
         ];
+
+        return $types[$this->guardian_type] ?? ucfirst($this->guardian_type);
     }
 
-    public function getStudentFullNameAttribute()
+    /**
+     * Get the parent's full information
+     */
+    public function getParentInfoAttribute()
     {
-        return $this->student ? $this->student->name : 'Unknown Student';
+        return $this->parent;
     }
 
-    public function getParentFullNameAttribute()
+    /**
+     * Get the student's full information
+     */
+    public function getStudentInfoAttribute()
     {
-        return $this->parent ? $this->parent->name : 'Unknown Parent';
-    }
-
-    public function getContactInfoAttribute()
-    {
-        return $this->parent ? [
-            'name' => $this->parent->name,
-            'email' => $this->parent->email,
-            'phone' => $this->parent->profile->phone_number ?? null,
-        ] : null;
-    }
-
-    // Check if this parent has access to the student's academic information
-    public function canViewStudentInfo()
-    {
-        return $this->parent && $this->student;
-    }
-
-    // Get all enrollments this parent can view
-    public function viewableEnrollments()
-    {
-        if (!$this->student) {
-            return collect();
-        }
-
-        return $this->student->enrollments()->active()->get();
-    }
-
-    // Get all classes this parent can view
-    public function viewableClasses()
-    {
-        return $this->viewableEnrollments()->pluck('class')->unique();
-    }
-
-    // Get all subjects this parent can view
-    public function viewableSubjects()
-    {
-        $classes = $this->viewableClasses();
-        return Subject::whereIn('class_id', $classes->pluck('id'))->get();
+        return $this->student;
     }
 }

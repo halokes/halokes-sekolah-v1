@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Announcement extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'announcements';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'school_id',
@@ -27,90 +32,73 @@ class Announcement extends Model
         'expire_at',
         'is_published',
         'is_sent_to_parents',
+        'created_by',
+        'updated_by'
     ];
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $casts = [
+        'target_audience' => 'array',
         'publish_at' => 'datetime',
         'expire_at' => 'datetime',
         'is_published' => 'boolean',
         'is_sent_to_parents' => 'boolean',
-        'target_audience' => 'array',
     ];
 
-    // Constants
-    const PRIORITY_LOW = 'low';
-    const PRIORITY_NORMAL = 'normal';
-    const PRIORITY_HIGH = 'high';
-    const PRIORITY_URGENT = 'urgent';
-
-    const AUDIENCE_ALL = 'all';
-    const AUDIENCE_SCHOOL_LEVEL = 'school_level';
-    const AUDIENCE_CLASS = 'class';
-    const AUDIENCE_SPECIFIC = 'specific';
-
-    // Relationships
-    public function school()
+    public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
     }
 
-    public function academicYear()
+    public function academicYear(): BelongsTo
     {
-        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
+        return $this->belongsTo(AcademicYear::class);
     }
 
-    public function class()
+    public function class(): BelongsTo
     {
-        return $this->belongsTo(ClassModel::class, 'class_id');
+        return $this->belongsTo(ClassModel::class);
     }
 
-    public function sender()
+    public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');
     }
 
-    // Scopes
-    public function scopeLow($query)
+    public function files(): MorphMany
     {
-        return $query->where('priority', self::PRIORITY_LOW);
-    }
-
-    public function scopeNormal($query)
-    {
-        return $query->where('priority', self::PRIORITY_NORMAL);
-    }
-
-    public function scopeHigh($query)
-    {
-        return $query->where('priority', self::PRIORITY_HIGH);
-    }
-
-    public function scopeUrgent($query)
-    {
-        return $query->where('priority', self::PRIORITY_URGENT);
+        return $this->morphMany('App\Models\File', 'fileable');
     }
 
     public function scopePublished($query)
     {
-        return $query->where('is_published', true);
+        return $query->where('is_published', true)
+                     ->where('publish_at', '<=', now())
+                     ->where(function ($query) {
+                         $query->whereNull('expire_at')
+                               ->orWhere('expire_at', '>=', now());
+                     });
     }
 
     public function scopeUnpublished($query)
     {
-        return $query->where('is_published', false);
+        return $query->where('is_published', false)
+                     ->orWhere('publish_at', '>', now())
+                     ->orWhere('expire_at', '<', now());
     }
 
-    public function scopeSentToParents($query)
+    public function scopeActive($query)
     {
-        return $query->where('is_sent_to_parents', true);
+        return $query->published();
     }
 
-    public function scopeNotSentToParents($query)
+    public function scopeExpired($query)
     {
-        return $query->where('is_sent_to_parents', false);
+        return $query->whereNotNull('expire_at')->where('expire_at', '<', now());
+    }
+
+    public function scopeUpcoming($query)
+    {
+        return $query->where('publish_at', '>', now())->where('is_published', false);
     }
 
     public function scopeForSchool($query, $schoolId)
@@ -128,236 +116,163 @@ class Announcement extends Model
         return $query->where('class_id', $classId);
     }
 
-    public function scopeCurrent($query)
+    public function scopeForSender($query, $senderId)
     {
-        return $query->where('is_published', true)
-                    ->where('publish_at', '<=', now())
-                    ->where(function ($q) {
-                        $q->whereNull('expire_at')->orWhere('expire_at', '>=', now());
-                    });
+        return $query->where('sender_id', $senderId);
     }
 
-    public function scopeExpired($query)
+    public function scopePriority($query, $priority)
     {
-        return $query->whereNotNull('expire_at')
-                    ->where('expire_at', '<', now());
+        return $query->where('priority', $priority);
     }
 
-    public function scopeUpcoming($query)
-    {
-        return $query->where('publish_at', '>', now());
-    }
-
-    public function scopeForAudience($query, $audienceType)
+    public function scopeAudienceType($query, $audienceType)
     {
         return $query->where('audience_type', $audienceType);
     }
 
-    // Accessors
-    public function getPriorityLabelAttribute()
+    public function scopeSentToParents($query)
     {
-        return self::getPriorities()[$this->priority] ?? $this->priority;
+        return $query->where('is_sent_to_parents', true);
     }
 
-    public function getPriorityColorAttribute()
+    public function scopeNotSentToParents($query)
     {
-        $colors = [
-            self::PRIORITY_LOW => 'text-gray-600 bg-gray-100',
-            self::PRIORITY_NORMAL => 'text-blue-600 bg-blue-100',
-            self::PRIORITY_HIGH => 'text-orange-600 bg-orange-100',
-            self::PRIORITY_URGENT => 'text-red-600 bg-red-100',
+        return $query->where('is_sent_to_parents', false);
+    }
+
+    public function scopeDateRange($query, $startDate, $endDate)
+    {
+        return $query->whereBetween('publish_at', [$startDate, $endDate]);
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        return $query->where(function ($q) use ($keyword) {
+            $q->where('title', 'like', '%' . $keyword . '%')
+              ->orWhere('content', 'like', '%' . $keyword . '%')
+              ->orWhere('priority', 'like', '%' . $keyword . '%')
+              ->orWhere('audience_type', 'like', '%' . $keyword . '%');
+        });
+    }
+
+    /**
+     * Get the priority name in a more readable format
+     */
+    public function getPriorityNameAttribute()
+    {
+        $priorities = [
+            'low' => 'Low',
+            'normal' => 'Normal',
+            'high' => 'High',
+            'urgent' => 'Urgent'
         ];
 
-        return $colors[$this->priority] ?? $colors[self::PRIORITY_NORMAL];
+        return $priorities[$this->priority] ?? ucfirst($this->priority);
     }
 
-    public function getAudienceTypeLabelAttribute()
+    /**
+     * Get the audience type name in a more readable format
+     */
+    public function getAudienceTypeNameAttribute()
     {
-        return self::getAudienceTypes()[$this->audience_type] ?? $this->audience_type;
+        $types = [
+            'all' => 'All Users',
+            'school_level' => 'School Level',
+            'class' => 'Specific Class',
+            'specific' => 'Specific Users/Roles'
+        ];
+
+        return $types[$this->audience_type] ?? ucfirst($this->audience_type);
     }
 
-    public function getIsCurrentAttribute()
+    /**
+     * Check if the announcement is currently active
+     */
+    public function getIsActiveAttribute()
     {
         return $this->is_published &&
-               $this->publish_at &&
-               $this->publish_at->lte(now()) &&
-               (!$this->expire_at || $this->expire_at->gte(now()));
+               $this->publish_at <= now() &&
+               (!$this->expire_at || $this->expire_at >= now());
     }
 
-    public function getIsExpiredAttribute()
+    /**
+     * Get the formatted publish date
+     */
+    public function getFormattedPublishDateAttribute()
     {
-        return $this->expire_at && $this->expire_at->lt(now());
+        return $this->publish_at->format('d M Y H:i');
     }
 
-    public function getIsUpcomingAttribute()
+    /**
+     * Get the formatted expire date
+     */
+    public function getFormattedExpireDateAttribute()
     {
-        return $this->publish_at && $this->publish_at->gt(now());
+        return $this->expire_at ? $this->expire_at->format('d M Y H:i') : 'Never';
     }
 
+    /**
+     * Get the file URL if attachment exists
+     */
+    public function getFileUrlAttribute()
+    {
+        if ($this->attachment_path) {
+            return asset('storage/' . $this->attachment_path);
+        }
+        return null;
+    }
+
+    /**
+     * Check if the announcement has an attachment
+     */
     public function getHasAttachmentAttribute()
     {
-        return !empty($this->attachment_path) && !empty($this->attachment_name);
+        return !is_null($this->attachment_path);
     }
 
-    public function getFormattedPublishAtAttribute()
+    /**
+     * Get the sender's information
+     */
+    public function getSenderInfoAttribute()
     {
-        return $this->publish_at ? $this->publish_at->format('d M Y H:i') : 'Not scheduled';
+        return $this->sender;
     }
 
-    public function getFormattedExpireAtAttribute()
+    /**
+     * Get the school information
+     */
+    public function getSchoolInfoAttribute()
     {
-        return $this->expire_at ? $this->expire_at->format('d M Y H:i') : 'Never expires';
+        return $this->school;
     }
 
-    public function getExpiryStatusAttribute()
+    /**
+     * Get the academic year information
+     */
+    public function getAcademicYearInfoAttribute()
     {
-        if (!$this->expire_at) {
-            return 'No expiry';
+        return $this->academicYear;
+    }
+
+    /**
+     * Get the class information
+     */
+    public function getClassInfoAttribute()
+    {
+        return $this->class;
+    }
+
+    /**
+     * Get the remaining time until expiration
+     */
+    public function getTimeRemainingAttribute()
+    {
+        if (!$this->expire_at || $this->is_expired) {
+            return 'N/A';
         }
 
-        if ($this->expire_at->isPast()) {
-            return 'Expired';
-        }
-
-        $daysUntilExpiry = now()->diffInDays($this->expire_at, false);
-        return "Expires in {$daysUntilExpiry} days";
-    }
-
-    // Mutators
-    public function setPriorityAttribute($value)
-    {
-        $this->attributes['priority'] = strtolower($value);
-    }
-
-    public function setAudienceTypeAttribute($value)
-    {
-        $this->attributes['audience_type'] = strtolower($value);
-    }
-
-    public function setPublishAtAttribute($value)
-    {
-        $this->attributes['publish_at'] = $value ? \Carbon\Carbon::parse($value) : null;
-    }
-
-    public function setExpireAtAttribute($value)
-    {
-        $this->attributes['expire_at'] = $value ? \Carbon\Carbon::parse($value) : null;
-    }
-
-    // Helper methods
-    public static function getPriorities()
-    {
-        return [
-            self::PRIORITY_LOW => 'Low',
-            self::PRIORITY_NORMAL => 'Normal',
-            self::PRIORITY_HIGH => 'High',
-            self::PRIORITY_URGENT => 'Urgent',
-        ];
-    }
-
-    public static function getAudienceTypes()
-    {
-        return [
-            self::AUDIENCE_ALL => 'All',
-            self::AUDIENCE_SCHOOL_LEVEL => 'School Level',
-            self::AUDIENCE_CLASS => 'Specific Class',
-            self::AUDIENCE_SPECIFIC => 'Specific Users',
-        ];
-    }
-
-    // Get target audience based on audience type
-    public function getTargetAudienceList()
-    {
-        if ($this->audience_type === self::AUDIENCE_SPECIFIC && $this->target_audience) {
-            return $this->target_audience;
-        }
-
-        return [];
-    }
-
-    // Check if announcement is visible to specific user
-    public function isVisibleToUser(User $user)
-    {
-        if (!$this->is_current) {
-            return false;
-        }
-
-        // School-level check
-        if ($this->school_id && $user->profile->school_id !== $this->school_id) {
-            return false;
-        }
-
-        // Academic year check
-        if ($this->academic_year_id) {
-            // Check if user is related to this academic year
-            $hasRelatedEnrollment = false;
-            if ($user->hasRole('ROLE_STUDENT')) {
-                $hasRelatedEnrollment = $user->enrollments()
-                    ->where('academic_year_id', $this->academic_year_id)
-                    ->exists();
-            } elseif ($user->hasRole('ROLE_TEACHER')) {
-                $hasRelatedEnrollment = $user->teacherSubjects()
-                    ->where('academic_year_id', $this->academic_year_id)
-                    ->exists();
-            }
-
-            if (!$hasRelatedEnrollment) {
-                return false;
-            }
-        }
-
-        // Class-specific check
-        if ($this->class_id) {
-            $hasRelatedClass = false;
-            if ($user->hasRole('ROLE_STUDENT')) {
-                $hasRelatedClass = $user->enrollments()
-                    ->where('class_id', $this->class_id)
-                    ->exists();
-            } elseif ($user->hasRole('ROLE_TEACHER')) {
-                $hasRelatedClass = $user->teacherSubjects()
-                    ->where('class_id', $this->class_id)
-                    ->exists();
-            }
-
-            if (!$hasRelatedClass) {
-                return false;
-            }
-        }
-
-        // Specific audience check
-        if ($this->audience_type === self::AUDIENCE_SPECIFIC && $this->target_audience) {
-            return in_array($user->id, $this->target_audience);
-        }
-
-        return true;
-    }
-
-    // Get the URL for the attachment
-    public function getAttachmentUrlAttribute()
-    {
-        if (!$this->has_attachment) {
-            return null;
-        }
-
-        return asset('storage/' . $this->attachment_path);
-    }
-
-    // Mark as sent to parents
-    public function markAsSentToParents()
-    {
-        $this->update(['is_sent_to_parents' => true]);
-    }
-
-    // Get announcements that should be sent to parents
-    public static function getAnnouncementsToSendToParents()
-    {
-        return self::current()
-            ->where('is_sent_to_parents', false)
-            ->where(function ($query) {
-                $query->where('audience_type', self::AUDIENCE_ALL)
-                      ->orWhere('audience_type', self::AUDIENCE_SCHOOL_LEVEL)
-                      ->orWhere('audience_type', self::AUDIENCE_CLASS);
-            })
-            ->get();
+        $diff = now()->diff($this->expire_at);
+        return $diff->days . ' days ' . $diff->h . ' hours';
     }
 }

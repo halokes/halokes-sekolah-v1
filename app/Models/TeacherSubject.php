@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TeacherSubject extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'teacher_subjects';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'teacher_id',
@@ -19,82 +23,32 @@ class TeacherSubject extends Model
         'teaching_role',
         'notes',
         'is_active',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
 
-    // Constants
-    const ROLE_REGULAR = 'regular';
-    const ROLE_ASSISTANT = 'assistant';
-    const ROLE_SUBSTITUTE = 'substitute';
-    const ROLE_HEAD = 'head';
-    const ROLE_COORDINATOR = 'coordinator';
-
-    // Relationships
-    public function teacher()
+    public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    public function subject()
+    public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
     }
 
-    public function class()
+    public function class(): BelongsTo
     {
-        return $this->belongsTo(ClassModel::class, 'class_id');
+        return $this->belongsTo(ClassModel::class);
     }
 
-    public function academicYear()
+    public function academicYear(): BelongsTo
     {
-        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
-    }
-
-    public function schedules()
-    {
-        return $this->hasMany(Schedule::class);
-    }
-
-    public function grades()
-    {
-        return $this->hasMany(Grade::class);
-    }
-
-    public function assignments()
-    {
-        return $this->hasMany(Assignment::class);
-    }
-
-    // Scopes
-    public function scopeRegular($query)
-    {
-        return $query->where('teaching_role', self::ROLE_REGULAR);
-    }
-
-    public function scopeAssistant($query)
-    {
-        return $query->where('teaching_role', self::ROLE_ASSISTANT);
-    }
-
-    public function scopeSubstitute($query)
-    {
-        return $query->where('teaching_role', self::ROLE_SUBSTITUTE);
-    }
-
-    public function scopeHead($query)
-    {
-        return $query->where('teaching_role', self::ROLE_HEAD);
-    }
-
-    public function scopeCoordinator($query)
-    {
-        return $query->where('teaching_role', self::ROLE_COORDINATOR);
+        return $this->belongsTo(AcademicYear::class);
     }
 
     public function scopeActive($query)
@@ -127,139 +81,86 @@ class TeacherSubject extends Model
         return $query->where('academic_year_id', $academicYearId);
     }
 
-    // Accessors
-    public function getTeachingRoleLabelAttribute()
+    public function scopeTeachingRole($query, $role)
     {
-        return self::getTeachingRoles()[$this->teaching_role] ?? $this->teaching_role;
+        return $query->where('teaching_role', $role);
     }
 
-    public function getIsRegularTeacherAttribute()
+    public function scopeRegular($query)
     {
-        return $this->teaching_role === self::ROLE_REGULAR;
+        return $query->where('teaching_role', 'regular');
     }
 
-    public function getIsAssistantTeacherAttribute()
+    public function scopeAssistant($query)
     {
-        return $this->teaching_role === self::ROLE_ASSISTANT;
+        return $query->where('teaching_role', 'assistant');
     }
 
-    public function getIsSubstituteTeacherAttribute()
+    public function scopeSubstitute($query)
     {
-        return $this->teaching_role === self::ROLE_SUBSTITUTE;
+        return $query->where('teaching_role', 'substitute');
     }
 
-    public function getIsHeadTeacherAttribute()
+    public function scopeSearch($query, $keyword)
     {
-        return $this->teaching_role === self::ROLE_HEAD;
+        return $query->where(function ($q) use ($keyword) {
+            $q->whereHas('teacher', function ($teacherQuery) use ($keyword) {
+                $teacherQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('email', 'like', '%' . $keyword . '%');
+            })->orWhereHas('subject', function ($subjectQuery) use ($keyword) {
+                $subjectQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('code', 'like', '%' . $keyword . '%');
+            })->orWhereHas('class', function ($classQuery) use ($keyword) {
+                $classQuery->where('name', 'like', '%' . $keyword . '%')
+                          ->orWhere('class_code', 'like', '%' . $keyword . '%');
+            })->orWhere('teaching_role', 'like', '%' . $keyword . '%')
+              ->orWhere('notes', 'like', '%' . $keyword . '%');
+        });
     }
 
-    public function getIsCoordinatorAttribute()
+    /**
+     * Get the teaching role name in a more readable format
+     */
+    public function getTeachingRoleNameAttribute()
     {
-        return $this->teaching_role === self::ROLE_COORDINATOR;
-    }
-
-    public function getTeacherNameAttribute()
-    {
-        return $this->teacher ? $this->teacher->name : 'Unknown Teacher';
-    }
-
-    public function getSubjectNameAttribute()
-    {
-        return $this->subject ? $this->subject->name : 'Unknown Subject';
-    }
-
-    public function getClassNameAttribute()
-    {
-        return $this->class ? $this->class->name : 'Unknown Class';
-    }
-
-    public function getAcademicYearNameAttribute()
-    {
-        return $this->academicYear ? $this->academicYear->name : 'Unknown Academic Year';
-    }
-
-    // Mutators
-    public function setTeachingRoleAttribute($value)
-    {
-        $this->attributes['teaching_role'] = strtolower($value);
-    }
-
-    // Helper methods
-    public static function getTeachingRoles()
-    {
-        return [
-            self::ROLE_REGULAR => 'Regular Teacher',
-            self::ROLE_ASSISTANT => 'Assistant Teacher',
-            self::ROLE_SUBSTITUTE => 'Substitute Teacher',
-            self::ROLE_HEAD => 'Head Teacher',
-            self::ROLE_COORDINATOR => 'Subject Coordinator',
+        $roles = [
+            'regular' => 'Regular Teacher',
+            'assistant' => 'Assistant Teacher',
+            'substitute' => 'Substitute Teacher'
         ];
+
+        return $roles[$this->teaching_role] ?? ucfirst($this->teaching_role);
     }
 
-    // Get total teaching hours for this assignment
-    public function getTotalTeachingHours()
+    /**
+     * Get the teacher's full information
+     */
+    public function getTeacherInfoAttribute()
     {
-        return $this->schedules()->active()->sum('duration');
+        return $this->teacher;
     }
 
-    // Get schedule count for this assignment
-    public function getScheduleCountAttribute()
+    /**
+     * Get the subject information
+     */
+    public function getSubjectInfoAttribute()
     {
-        return $this->schedules()->active()->count();
+        return $this->subject;
     }
 
-    // Get student count for this assignment
-    public function getStudentCountAttribute()
+    /**
+     * Get the class information
+     */
+    public function getClassInfoAttribute()
     {
-        return $this->class ? $this->class->student_count : 0;
+        return $this->class;
     }
 
-    // Get assignment count for this assignment
-    public function getAssignmentCountAttribute()
+    /**
+     * Get the academic year information
+     */
+    public function getAcademicYearInfoAttribute()
     {
-        return $this->assignments()->published()->count();
-    }
-
-    // Get grade count for this assignment
-    public function getGradeCountAttribute()
-    {
-        return $this->grades()->count();
-    }
-
-    // Check if teacher is available for more classes
-    public function isAvailableForMoreClasses()
-    {
-        // This is a simple check - you can make it more sophisticated
-        $currentScheduleCount = $this->schedule_count;
-        $maxSchedulesPerTeacher = 30; // Adjust as needed
-
-        return $currentScheduleCount < $maxSchedulesPerTeacher;
-    }
-
-    // Get all related enrollments
-    public function enrollments()
-    {
-        return Enrollment::where('class_id', $this->class_id)
-                        ->where('academic_year_id', $this->academic_year_id)
-                        ->get();
-    }
-
-    // Get all related students
-    public function students()
-    {
-        return $this->enrollments->pluck('student');
-    }
-
-    // Check if this teacher subject has any schedule conflicts
-    public function hasScheduleConflicts()
-    {
-        $conflicts = Schedule::where('class_id', $this->class_id)
-                            ->where('day_of_week', $this->schedules->first()->day_of_week ?? null)
-                            ->where('teacher_id', $this->teacher_id)
-                            ->where('id', '!=', $this->id ?? null)
-                            ->where('is_active', true)
-                            ->exists();
-
-        return $conflicts;
+        return $this->academicYear;
     }
 }

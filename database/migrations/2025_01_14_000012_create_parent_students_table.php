@@ -19,6 +19,8 @@ return new class extends Migration
             $table->string('guardian_type'); // biological, adoptive, foster, other
             $table->boolean('is_primary')->default(false);
             $table->text('notes')->nullable();
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

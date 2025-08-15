@@ -1,445 +1,407 @@
+# Sistem Informasi Sekolah (SIS)
+
 ![Alt Text](public/assets/img/logo/logo-medium.png)
-# SAMBoilerplate 11
 
-No longer developing powerful apps from zero, SamBoilerplate is a ready-to-use foundation for building any applications which need admin-like functionality. Designed to help you get started faster without writing everything from scratch. 
-This boilerplate is tailored for developers who want a solid base to customise and expand according to their needs.
+## Ringkasan Sistem
 
-[*Access the demo here*](http://samboilerplate.halokes.id)
-***
-Current version 11.4.1 
-See our [Changelog](changelog.md)
+Sistem Informasi Sekolah (SIS) ini dirancang untuk mendukung operasional akademik sekolah jenjang SD/SMP/SMA dengan arsitektur multi-tenant (SaaS) yang sudah ada. Sistem akan fokus pada manajemen akademik terlebih dahulu dengan kemampuan untuk menambahkan fitur keuangan di masa depan.
 
-## Key Features
-1. **Ultimate CRUD**
-You already know CRUD, but we level up standard CRUD into Ultimate CRUD principles. You can found the example of our Ultimate CRUD in **our EXAMPLE** for User Management features.
-   - **List User** : A page which  list all of the available users. Each rows will shows basic user’s data. Along with link to detail, edit, and delete data. 
-The Ultimate CRUD is this is not just a list of data. But here you can : 
-     - **Search Data** : there is a search form wher you can quickly search for any user by part of their name or email.
-     - **Dynamic Paging** : you can define how many data per pages, along with easy navigation between pages
-     - **Sort Table** : You can sort the data by any column here, the paging and filter will be intact
-   - **CreateUser** : a standard user creation
-   - **Read User** : view user in more detailed than in List pages.
-   - **Update User** : 
-   - **Delete User** : User will be shown delete confirmation page, before he actually deletes the data. 
+## 🎯 User Roles & Tindakan yang Diperbolehkan
 
-1. **Blade template based Engine**
-I  know some of you fluent with Vue, or possibly want to use Laravel Livewire. But I understand that not all of you want them and simply just want something that works simple and fast. That’s why we use all Blade based template in here. 
-1. **Admin Layout Bootstrap Themed**
-Most application often need “admin template”. In here we choose Sneat AdminTemplate which based on Bootstrap Framework. 
-1. **Modern Design Pattern**
-We follow modern design in software development : Controller Service Repository. Separating request handling from logic and from DB layer. 
-1. **Queue Email Delivery**
-Get rid of blocking journey using queue. The auth email delivery is now use Queue. Simply change the queue=sync to 'database' or any your queue choice
-1. **Unit Test**
-Yeah, we already implement some the unit test which you can simply run with “php artisan test” as usual. or with “php artisan test –coverage” to get code coverage. We set our standard to be above 80% code coverage (currently 90%+) code coverage. 
-1. **Complete Authentication (Auth)**  :
-The authentication system basically uses Laravel Breeze, but fully modified to work with Blade templates instead of the default Vite, providing a more straightforward template management experience. Some Pre-built features include : 
-    - Login page,
-   - Register Page, 
-   - Email Verification
-   - Password Reset
-1. **Role Based User Authentication**
-A user is defined by its roles. A user can have multiple roles. Any routes or a blade features can be protected or be shown based on roles that a user has. Default setup have 4 roles, admin, supervisor, operator, and user. There is also an example of a super admin user where you can have all of these roles at once!
-1. **Easy Configuration**
-We put most of configuration setting in constant.php You can configure like if users need to verify their email before able to login, or if a newly registered user is not able to login until an admin activate his account, etc.
-1.   **Others** : Change User Profiles, change password,  Print Preview, Deactivate account, UI samples, etc. 
+### 1. **Superintendent / Kepala Sekolah**
+**Role Code:** `ROLE_SUPERINTENDENT`
 
+**Tindakan Utama:**
+- Pengelolaan seluruh sistem di level sekolah
+- Pembuatan dan pengelolaan jadwal pelajaran
+- Penetapan kurikulum dan mata pelajaran
+- Pengelolaan guru dan kelas
+- Monitoring kinerja akademik sekolah
+- Generate laporan akademik sekolah
+- Pengelolaan pengguna dan akses
 
-***
-## Getting Started
+**Fitur Spesifik:**
+- Dashboard overview sekolah
+- Jadwal pelajaran komprehensif
+- Distribusi beban kerja guru
+- Analisis hasil belajar sekolah
+- Manajemen kalender akademik
 
-To run this application, you need the following:
+### 2. **Guru / Wali Kelas**
+**Role Code:** `ROLE_TEACHER`
 
-- **PHP 8.2 or higher** (I personally Recommend: PHP 8.3 or higher)
-- PHP extensions required by Laravel:
-  - `mbstring`, `xml`, `curl`, `mysql`, `zip`, `bcmath`, `json`, `gd`
-- **Composer**: [Install Composer](https://getcomposer.org/)
-- **MySQL** (or another database of your choice)
+**Tindakan Utama:**
+- Input nilai siswa
+- Input kehadiran siswa
+- Penilaian harian dan uts/uas
+- Pengelolaan tugas dan materi pelajaran
+- Komunikasi dengan siswa dan orang tua
+- Generate laporan kelas
 
-### Example Installation (Ubuntu with PHP 8.3):
+**Fitur Spesifik:**
+- Dashboard kelas
+- Input nilai per mata pelajaran
+- Tracking kemajuan siswa
+- Manajemen tugas dan deadline
+- Komunikasi dengan orang tua
 
-```bash
-sudo apt update
-sudo apt install php8.3 php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl php8.3-mysql php8.3-zip php8.3-bcmath php8.3-json php8.3-gd
+### 3. **Siswa**
+**Role Code:** `ROLE_STUDENT`
+
+**Tindakan Utama:**
+- Melihat jadwal pelajaran
+- Melihat nilai dan hasil belajar
+- Melihat kehadiran
+- Mengumpulkan tugas online
+- Komunikasi dengan guru
+- Tracking kemajuan diri
+
+**Fitur Spesifik:**
+- Dashboard pribadi siswa
+- Riwayat nilai dan predikat
+- Daftar tugas dan deadline
+- Riwayat kehadiran
+- Materi pembelajaran online
+
+### 4. **Orang Tua / Wali**
+**Role Code:** `ROLE_PARENT`
+
+**Tindakan Utama:**
+- Melihat nilai anak
+- Melihat kehadiran anak
+- Melihat jadwal pelajaran anak
+- Komunikasi dengan guru
+- Tracking perkembangan akademik
+- Pesan sekolah
+
+**Fitur Spesifik:**
+- Dashboard anak
+- Riwayat akademik lengkap
+- Monitoring kehadiran
+- Komunikasi dengan guru
+- Notifikasi penting
+
+### 5. **Tenaga Kependidikan / TU**
+**Role Code:** `ROLE_STAFF`
+
+**Tindakan Utama:**
+- Manajemen data siswa (pendaftaran, mutasi, kelulusan)
+- Manajemen data guru dan karyawan
+- Pengelolaan administrasi sekolah (surat-menyurat, arsip)
+- Pengelolaan keuangan sekolah (pembayaran SPP, tagihan, gaji)
+- Pengelolaan inventaris sekolah
+- Generate laporan administrasi dan keuangan
+
+**Fitur Spesifik:**
+- Dashboard administrasi
+- Modul pendaftaran siswa baru
+- Modul manajemen data karyawan
+- Modul keuangan (pembayaran, tagihan, laporan keuangan)
+- Modul inventaris
+- Manajemen surat-menyurat
+
+### 6. **Operator Sekolah**
+**Role Code:** `ROLE_OPERATOR` (sudah ada)
+
+**Tindakan Utama:**
+- Input data siswa baru
+- Input data guru baru
+- Pembuatan akun pengguna
+- Manajement data master
+- Generate laporan operasional
+
+**Fitur Spesifik:**
+- Pendaftaran siswa/guru
+- Manajement data profil
+- Generate laporan administrasi
+- Backup dan restore data
+
+### 7. **Administrator Sistem**
+**Role Code:** `ROLE_ADMIN` (sudah ada)
+
+**Tindakan Utama:**
+- Pengelolaan multi-sekolah (SaaS)
+- Konfigurasi sistem
+- Manajement pengguna global
+- Monitoring sistem
+- Update versi sistem
+
+**Fitur Spesifik:**
+- Dashboard multi-sekolah
+- Konfigurasi aplikasi
+- Manajement roles & permissions
+- Monitoring performa sistem
+
+## 🏗️ Arsitektur Sistem
+
+### Struktur Database Tambahan
+
+```mermaid
+erDiagram
+    users ||--o{ user_profiles : "has"
+    users ||--o{ student_enrollments : "enrolls"
+    users ||--o{ teacher_assignments : "assigned"
+    users ||--o{ parent_students : "has_child"
+    
+    schools {
+        uuid id PK
+        string name
+        string code
+        string address
+        string phone
+        string email
+        string logo
+        boolean is_active
+        timestamps
+    }
+    
+    school_levels {
+        uuid id PK
+        string name
+        string code
+        string description
+        timestamps
+    }
+    
+    academic_years {
+        uuid id PK
+        string name
+        string year_code
+        date start_date
+        date end_date
+        uuid school_id FK
+        boolean is_active
+        timestamps
+    }
+    
+    classes {
+        uuid id PK
+        string name
+        string class_code
+        uuid school_id FK
+        uuid level_id FK
+        uuid homeroom_teacher_id FK
+        timestamps
+    }
+    
+    subjects {
+        uuid id PK
+        string name
+        string code
+        string description
+        uuid school_id FK
+        timestamps
+    }
+    
+    schedules {
+        uuid id PK
+        uuid class_id FK
+        uuid subject_id FK
+        uuid teacher_id FK
+        string day_of_week
+        time start_time
+        time end_time
+        string room
+        timestamps
+    }
+    
+    enrollments {
+        uuid id PK
+        uuid student_id FK
+        uuid class_id FK
+        uuid academic_year_id FK
+        string status
+        date enrollment_date
+        timestamps
+    }
+    
+    attendances {
+        uuid id PK
+        uuid enrollment_id FK
+        uuid teacher_id FK
+        date attendance_date
+        string status
+        string notes
+        timestamps
+    }
+    
+    grades {
+        uuid id PK
+        uuid enrollment_id FK
+        uuid subject_id FK
+        uuid teacher_id FK
+        string assessment_type
+        string score
+        string grade
+        string notes
+        date assessment_date
+        timestamps
+    }
+    
+    assignments {
+        uuid id PK
+        uuid subject_id FK
+        uuid teacher_id FK
+        string title
+        text description
+        string assignment_type
+        datetime due_date
+        datetime submission_start
+        datetime submission_end
+        timestamps
+    }
+    
+    submissions {
+        uuid id PK
+        uuid assignment_id FK
+        uuid student_id FK
+        text content
+        string file_path
+        string status
+        datetime submitted_at
+        timestamps
+    }
 ```
 
-### Initial Setup : 
-1. In your terminal run
-```bash
-composer install
+### Alur Proses Akademik
+
+```mermaid
+flowchart TD
+    A[Pendaftaran Siswa] --> B[Pembagian Kelas]
+    B --> C[Pembuatan Jadwal]
+    C --> D[Pengelolaan Kehadiran]
+    D --> E[Penilaian Akademik]
+    E --> F[Pelaporan Progress]
+    F --> G[Monitoring Kemajuan]
+    
+    H[Guru] --> D
+    H --> E
+    H --> F
+    
+    I[Siswa] --> E
+    I --> F
+    I --> G
+    
+    J[Orang Tua] --> F
+    J --> G
 ```
 
-2. copy .env.example into .env files, then configure your database setting there
-
-3. In your terminal run again : 
-```
-php artisan key:generate
-php artisan migrate:fresh && php artisan db:seed
-```
-1. SamBoilerplate 11 now should be ready. 
-
-*(Optional) If you want to populate the User with around 100 sample of user data run*
-```bash
-php artisan db:seed --class=FakeUserSeeder
-```
-
-### Running : 
-1. In your terminal run : 
-```bash
-php artisan serve
-```
-
-2. Then you can access it in : `http://localhost:8000` via your browser 
-
-3. The `8000` is depend on you configuration port. If you want to run in another port (e.g. port 9999) you can run : 
-
-```bash
-php artisan serve --port=9999
-```
-
-### Testing:
-
-```bash
-php artisan test
-```
-
-Or if you want to produce code coverage 
-
-```bash
-php artisan test –coverage
-```
-
-
-***
-
-# Default Credentials
-There are 4 roles and 5 default users if you run `php artisan db:seed` as above. 
-After seeding the database, the following default users will be available:
-
-| Email                         | Role                                                  | Password        |
-| ----------------------------- | ----------------------------------------------------- | --------------- |
-| superadmin@halokes.id | ROLE_ADMIN, ROLE_SUPERVISOR, ROLE_OPERATOR, ROLE_USER | *`password123`* |
-| admin@halokes.id      | ROLE_ADMIN, ROLE_USER                                 | *`password123`* |
-| supervisor@halokes.id | ROLE_SUPERVISOR, ROLE_USER                            | *`password123`* |
-| operator@halokes.id   | ROLE_OPERATOR, ROLE_USER                              | *`password123`* |
-| user@halokes.id       | ROLE_USER                                             | *`password123`* |
-
-
-- Only admin and superadmin which has ROLE_ADMIN roles. 
-- ALL user above has ROLE_USER by default. 
-- A user can have none to all roles available
-- User superadmin can access anything since he has ALL THE ROLES!
-
-#### Role in Routing
-You can restrict certain action based on Role on the routes files. Below is the example how to restric certain routes only able to be accessed by ROLE_ADMIN
-```php
-// this route only able to be accessed by ROLE_ADMIn
-    Route::prefix('/admin')
-        ->middleware('role:ROLE_ADMIN')
-        ->group(function () {
-            Route::get('/user',                     [UserController::class, 'index'])->name('admin.user.index');
-            Route::get('/user/add/new',             [UserController::class, 'create'])->name('admin.user.add');
-            Route::post('/user/add/new',            [UserController::class, 'store'])->name('admin.user.store');
-            //......
-        });
-
-// this route only able to be accessed by ROLE_SUPERVISOR
-Route::get('/supervisor-page', [SupervisorController::class, 'index']) ->name('supervisor-page')->middleware('role:ROLE_SUPERVISOR');
-
-```
-
-#### Role in Blade Templating
-You can make certain part of blade only shown in certain role. Look at the `sidebar.blade.php` if you want to deep dive. Here are the examples. 
-
-```php
-//make menu only visible if user has ROLE_OPERATOR
-  @if (auth()->user()->hasRole('ROLE_OPERATOR'))
-    @include('admin.components.sidebar.menu-header', ['textMenuHeader' => 'Operator Menu'])
-    @include('admin.components.sidebar.item', [
-      'menuId' => 'menu-operator-pages',
-      'menuText' => 'Operator',
-      'menuUrl' => route('operator-page'),
-      'menuIcon' => 'bx bx-train',
-      'subMenuData' => null,
-  ])
-@endif
-```
-
-
-# Code Structure
-
-## Routing
-There are two main routes in this code
-- `web.php` -> *for non auth routing*
-- `auth.php` -> *for auth related routing*
-
-## Enabling Queue: 
-On .env change 
-
-```bash
-QUEUE_CONNECTION=sync
-```
-
-Into
-
-```bash
-QUEUE_CONNECTION=database
-```
-
-Please Note that you need queue worker to run the queue 
-Like 
-
-```bash
-php artisan queue:listen
-```
-
-or 
-```bash
-php artisan queue:work
-```
-
-## Important Configuration:
-Most configuration in this SamBoilerplate is placed in file `constant.php` in config folder. 
-- By default new registered user via register route will be assigned `ROLE_USER` roles. If you need something else, change the `NEW_USER_DEFAULT_ROLES` variable.
-- By default all user new registered user via register route will be assigned `is_active` TRUE which enabled them to login. If you want to change it, change `NEW_USER_STATUS_ACTIVE` 
-- By default all user new registered user via register route able to login even if their email is not verified. To change this setting, set on file  `NEW_USER_NEED_VERIFY_EMAIL` 
-
-## Design Pattern
-I write most of the code here in following structures
-`Controller -> Service -> Repository`
-- Repository handles the data modelling
-- Service handles the 'business' logic
-- Controller handles the Validation and request handling, also with view logic, about what to be shown in View. 
-
-An example of use case is like in User CRUD, there is 
-- UserController.php
-- UserService.php
-- UserRepository.php
-
-the flow is (more or less) like as follows
-`Request -> UserController -> UserService -> UserRepository -> DB` 
-But **not all** function use this. Sometimes it is just UserController and then direct to View, especially if no business logic or database related operation hapen. 
-
-### Try Catch Exception
-I am used to use try catch exception in many of my projects. Including this SamBoilerplate. You may found here. Most of the time I simply throw and catch generic `Exception` but in some, you may found some "custom" Exception like `IncorrectPasswordException`
-
-### DB Transaction
-For some operation which requires a bit 'complicated operation', I put DB transactions in them. Feel free to modify based on you want (e.g. move the transaction from controller to service or vice versa) 
-
-
-### Helper class
-there are two classes related to helper
-- `AlertHelper` -> relates to 'wrap' the alert messages (the around red or green box in tops of any form)
-- `ErrorHelper` -> relates to centralized error message management, if you want to use this (very usefull if you make API related)
-
-## License Notes
-My code is mostly on Laravel side. However, most of the UI here is using Sneat Theme. I use the free version of theirs so I still put the credit on the footer of any pages. 
-Buying my license didn't mean you buy their license. Please check their license plan in 
-
-***
-## Key Features Of SamBoilerplate 11
-
-### Ultimate CRUD
-You already know CRUD, but we level up standard CRUD into **Ultimate CRUD** principles. You can find the example of our Ultimate CRUD in our example for **User Management Ultimate CRUD**.
-
-- **List Pages**: A page that lists all available users. Each row shows basic user data, along with links to view, edit, and delete data.
-- The Ultimate CRUD is not just a list of data. Here you can:
-  - **Search Data**: There is a search form where you can quickly search for any user by part of their name or email.
-  - **Dynamic Paging**: You can define how many items per page, along with easy navigation between pages.
-  - **Sortable**: You can sort the data by any column.
-  - **Create User**: A standard user creation functionality.
-  - **Read User**: View user details in more detail than on the list pages.
-  - **Update User**: Update user information.
-  - **Delete User**: A delete confirmation page will be shown before actually deleting the data.
-
-### Blade Template Based Engine
-I know some of you are fluent with Vue or possibly want to use Laravel Livewire. However, I understand that not everyone wants them and simply desires something that works simply and fast. That’s why we use a Blade-based template here.
-
-### Admin Layout Bootstrap Themed
-Most applications often need an “admin template.” Here, we chose the **Sneat Admin Template**, which is based on the Bootstrap framework.
-
-### Modern Design Pattern
-We follow modern design in software development: **Controller-Service-Repository**. This pattern separates request handling from business logic and the database layer.
-
-### Queue Email Delivery
-For two functionalities in our authentication system—email verification and password reset—we have implemented a queue for email handling instead of synchronous processing. 
-
-### Unit Test
-Yes, we have implemented unit tests that you can simply run with `php artisan test` or with `php artisan test --coverage` to get code coverage. We set our standard to be above 80% code coverage (currently 90%+).
-
-### Authentication (Auth)
-The authentication system primarily uses **Laravel Breeze**, fully modified to work with Blade templates instead of the default Vite, providing a more straightforward template management experience. Some pre-built features include:
-- Login page
-- Register page
-- Email verification
-- Password reset
-
-Email handling (e.g., password reset emails) utilizes the queue system for better performance but can also be switched to synchronous mode if your server doesn’t support queues.
-
-### Role-Based User Authentication
-A user is defined by their roles. A user can have multiple roles, and any routes or Blade features can be protected or displayed based on the roles a user has. The default setup has four roles: admin, supervisor, operator, and user. There is also an example of a super admin user who can have all of these roles at once!
-
-### Easy Configuration
-We place most configuration settings in `constant.php`. You can configure whether users need to verify their email before being able to log in or if a newly registered user cannot log in until an admin activates their account, etc. 
-
-Change user profiles, print preview, deactivate account, UI samples, etc.
-
-## Why This Boilerplate is Right for You:
-
-- **Save Time**: All the basic features are ready to go, so you don’t have to rewrite common functions like login, registration, or user management.
-- **Beginner-Friendly**: The code is organized in a way that’s easy to understand, even if you’re just starting out with Laravel.
-- **Comprehensive Documentation**: Step-by-step documentation to guide you through understanding and extending the features.
-
-With this boilerplate, you can focus on developing the core features of your application without wasting time building the basics from scratch. It's ideal for anyone looking to quickly build a feature-rich admin application!
-
-## Showcase
-
-<!--========================== AUTH SYSTEM IS HERE ==========================  -->
-### Auth system
-Here is some showcase related to Auth
-
-#### User Registration
-![Register pages](public/assets/img/manual/auth/cropped/auth-registration.png)
-##### After Register need Email Verification
-![After register need email verification](public/assets/img/manual/auth/cropped/auth-confirm-email.png)
-##### After Register but Need Admin activation
-![Register pages need Admin Activation](public/assets/img/manual/auth/cropped/auth-admin-review.png)
-##### After Register but Need Admin activation and Email verification
-![Register pages need Admin Activation and email verify](public/assets/img/manual/auth/cropped/auth-registration-admin-verify.png)
-
-
-
-#### Login
-![Login pages](public/assets/img/manual/auth/cropped/auth-login.png)
-##### Login Email not verified
-![Login Email not verified](public/assets/img/manual/auth/cropped/auth-verify-email-required.png)
-
-### Email Verification
-##### Resend email verification
-![Resend Email Verification](public/assets/img/manual/auth/cropped/auth-resend-notification.png)
-
-##### Resend Email verification success
-![Resend Email verification success](public/assets/img/manual/auth/cropped/auth-verification-email-success.png)
-
-##### Email 
-![Email verify](public/assets/img/manual/other/email-verify.png)
-
-
-
-#### Forgot Password
-![Forgot password](public/assets/img/manual/auth/cropped/auth-forgot-password.png)
-##### Forgot password send success
-![Forgot password send success](public/assets/img/manual/auth/cropped/auth-forgot-password-send-success.png)
-
-<!--========================== DASHBOARD AND NAVIGATION ==========================  -->
-
-## Dashboard and Navigation
-Things you will find when you successfully login
-### Dashboard
-![Dashboard Pages](public/assets/img/manual/dashboard/backoffice-dashboard-2.png)
-### Top Right Menu
-![Top right menu](public/assets/img/manual/navigation/backoffice-navigation-top-menu.png)
-### Sidebar
-![Sidebar navigation](public/assets/img/manual/navigation/backoffice-navigation-sidebar.png)
-
-## Ultimate CRUD Example : User Management
-Showcase on ultimate CRUD in User management examples
-### List User (with fake data)
-![List user](public/assets/img/manual/crud//backoffice-crud-user-list-with-faker.png)
-
-#### Search User
-![Search User](public/assets/img/manual/crud/backoffice-crud-user-search.png)
-
-#### Sort User by Name Descending
-![Sort User by name descending](public/assets/img/manual/crud/backoffice-crud-user-list-sort-by-name-descending.png)
-
-#### Dynamic Per-Page Paging
-![Dynamic Paging](public/assets/img/manual/crud/backoffice-crud-user-list-dynamic-perpage-paging.png)
-
-#### Paging Page Element
-![Paging Elements](public/assets/img/manual/crud/backoffice-crud-user-list-paging.png)
-
-### View / Detail User
-![View / Detail user](public/assets/img/manual/crud/backoffice-crud-user-detail.png)
-
-
-### Add User
-![Add user](public/assets/img/manual/crud/backoffice-crud-add-user.png)
-
-
-### Edit User
-![Edit User](public/assets/img/manual/crud/backoffice-crud-edit-user.png)
-
-
-#### Edit User - validation error
-![Edit User Validation error](public/assets/img/manual/crud/backoffice-crud-user-edit-validation-error.png)
-
-### Delete User
-#### Confirm Before Delete
-![Delete User Confirm](public/assets/img/manual/crud/backoffice-crud-user-delete-confirm.png)
-#### Delete Success
-![Delete Success](public/assets/img/manual/crud/backoffice-crud-user-delete-success.png)
-
-
-## User Profile
-#### New User has no Profile
-![blank user profile](public/assets/img/manual/userprofile/backoffice-userprofile-blank.png)
-#### Filling User Profile form
-![Filling User Profile form](public/assets/img/manual/userprofile/backoffice-userprofile-filled.png)
-#### Update user profile Success
-![Update user profile Success](public/assets/img/manual/userprofile/backoffice-userprofile-update-success.png)
-#### User Profile - incorrect change image
-![User Profile - incorrect change image](public/assets/img/manual/userprofile/backoffice-userprofile-validation-error.png)
-
-
-
-## User Setting
-### Change Password
-![Change Password](public/assets/img/manual/usersetting/backoffice-user.setting-change-password.png)
-#### Change Password success
-![Change Password](public/assets/img/manual/usersetting/backoffice-usersetting-changepassword-success.png)
-### Deactivate Accounts
-![Deactivate Accounts 1](public/assets/img/manual/usersetting/backoffice-usersetting-disableaccount-page.png)
-#### Deactivate Accounts - mandatory checkbox
-![Deactivate Accounts 2](public/assets/img/manual/usersetting/backoffice-usersetting-disableaccount-page-checkbox-mandatory.png)
-#### Deactivate Accounts - success
-![Deactivate Accounts 3 ](public/assets/img/manual/usersetting/backoffice-usersetting-disableaccount-success.png)
-
-
-## Others
-### Demo Print pages 
-When you might need preview or print at the same time
-![Print A4](public/assets/img/manual/other/backoffice-user.setting.demoprint-pages.png)
-![Print A4 Preview](public/assets/img/manual/other/backoffice-user.setting.demoprint-pages-printdialog.png)
-
-### UI Samples 
-These UI samples all from the theme. You can see more on their site. See our footer for their themes.
-#### Demo UI Cards
-![Demo UI Card](public/assets/img/manual/other/backoffice-sampleui-card.png)
-#### Demo UI Table
-![Demo UI Table](public/assets/img/manual/other/back0ffice-demoui-table.png)
-#### Demo UI Form 1
-![Demo UI Form 1](public/assets/img/manual/other/back0ffice-demoui-form1.png)
-#### Demo UI Form 2
-![Demo UI Form 2](public/assets/img/manual/other/back0ffice-demoui-form2.png)
-#### Demo UI Blank
-![Demo UI Blank](public/assets/img/manual/other/back0ffice-demoui-blank.png)
-
-
-
-## Landing Pages
-SamBoilerplate mostly is about admin / back office pages. This landing page is just a bonus
-![Landing pages](public/assets/img/manual/other/landing-page.png)
-
-
-## Code Quality and Test Unit
-Coding style (I love comments!)
-![coding style](public/assets/img/manual/other/code-quality-standard.png)
-Run your Unit test
-![Unit Test](public/assets/img/manual/unittest/unit%20test%20running.png)
-Our minimum Quality Standard is 80% Code Coverage
-![Code Coverage](public/assets/img/manual/unittest/code%20coverage.png)
+## 📊 Fitur Akademik Inti
+
+### 1. **Manajemen Master Data**
+- Sekolah (Multi-tenant)
+- Tingkat Pendidikan (SD/SMP/SMA)
+- Tahun Ajaran
+- Kelas & Jurusan
+- Mata Pelajaran
+- Guru & Siswa
+- Kurikulum
+
+### 2. **Jadwal Pelajaran**
+- Pembuatan jadwal otomatis
+- Konflik jadwal detection
+- Jadwal per kelas/guru
+- Jadwal mobile-friendly
+- Notifikasi perubahan jadwal
+
+### 3. **Kehadiran & Absensi**
+- Input kehadiran harian
+- Rekap kehadiran bulanan
+- Sistem izin & sakit
+- Notifikasi kehadiran ke orang tua
+- Laporan kehadiran lengkap
+
+### 4. **Penilaian Akademik**
+- Input nilai harian, uts, uas
+- Perhitungan rapor otomatis
+- Grading system kustom
+- Predikat & keterangan
+- Progress tracking per semester
+
+### 5. **Tugas & Materi Pembelajaran**
+- Upload tugas online
+- Deadline management
+- Materi pembelajaran digital
+- Sistem pengumpulan tugas
+- Feedback guru-siswa
+
+### 6. **Komunikasi & Notifikasi**
+- Sistem pesan internal
+- Email & SMS notification
+- Announcements sekolah
+- Orang tua-guru communication
+- Mobile notification
+
+### 7. **Pelaporan & Analytics**
+- Dashboard akademik
+- Progress report siswa
+- Laporan kelas/sekolah
+- Analisis hasil belajar
+- Export data (PDF/Excel)
+
+## 🔧 Integrasi & Teknis
+
+### **Teknologi Stack**
+- **Backend:** Laravel 11+ (existing)
+- **Frontend:** Blade/TailwindCSS (existing)
+- **Database:** PostgreSQL/MySQL
+- **Storage:** Local/Cloud Storage
+- **Notification:** Email, SMS, Push Notification
+
+### **API Requirements**
+- RESTful API for mobile apps
+- Webhook for external integrations
+- Real-time updates (WebSocket)
+- Export/Import data formats
+
+### **Security & Compliance**
+- Role-based access control (existing)
+- Data encryption
+- Audit logging
+- GDPR compliance
+- Backup & recovery
+
+## 📱 User Interface Requirements
+
+### **Dashboard Design**
+- **Superintendent:** Overview sekolah dengan metrics kunci
+- **Guru:** Dashboard kelas dengan tugas & nilai
+- **Siswa:** Dashboard pribadi dengan progress belajar
+- **Orang Tua:** Dashboard anak dengan aktivitas akademik
+- **Operator:** Dashboard administrasi & data entry
+- **Tenaga Kependidikan / TU:** Dashboard administrasi dan keuangan
+
+### **Responsive Design**
+- Mobile-first approach
+- Tablet & desktop optimization
+- Offline capability (mobile apps)
+- Accessibility compliance
+
+## 📅 Implementasi Roadmap
+
+### **Phase 1: Core Academic System (2-3 bulan)**
+- Setup multi-tenant structure
+- Implement user roles
+- Master data management
+- Basic scheduling system
+- Attendance tracking
+
+### **Phase 2: Academic Management (2-3 bulan)**
+- Grading system
+- Assignment management
+- Progress reporting
+- Basic communication
+
+### **Phase 3: Advanced Features (1-2 bulan)**
+- Analytics & reporting
+- Mobile interface
+- Integration capabilities
+- Performance optimization
+
+### **Phase 4: Financial Module (Future)**
+- Tuition fee management
+- Payment tracking
+- Expense management
+- Billing system
 
 ---
-## Thank You
-and lets build great apps!

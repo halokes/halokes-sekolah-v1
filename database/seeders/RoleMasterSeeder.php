@@ -22,6 +22,7 @@ class RoleMasterSeeder extends Seeder
             ['role_name' => 'Teacher', 'role_code' => 'ROLE_TEACHER'],
             ['role_name' => 'Student', 'role_code' => 'ROLE_STUDENT'],
             ['role_name' => 'Parent', 'role_code' => 'ROLE_PARENT'],
+            ['role_name' => 'Staff', 'role_code' => 'ROLE_STAFF'],
         ];
 
         DB::table('role_master')->insert($roles);

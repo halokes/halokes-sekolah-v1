@@ -2,14 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Assignment extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'assignments';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'subject_id',
@@ -29,10 +35,9 @@ class Assignment extends Model
         'allow_late_submission',
         'late_penalty_percent',
         'academic_year_id',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
         'due_date' => 'datetime',
@@ -41,78 +46,37 @@ class Assignment extends Model
         'max_score' => 'integer',
         'is_published' => 'boolean',
         'allow_late_submission' => 'boolean',
-        'late_penalty_percent' => 'integer',
+        'late_penalty_percent' => 'decimal:2',
     ];
 
-    // Constants
-    const TYPE_HOMEWORK = 'homework';
-    const TYPE_PROJECT = 'project';
-    const TYPE_QUIZ = 'quiz';
-    const TYPE_EXAM = 'exam';
-    const TYPE_PRESENTATION = 'presentation';
-    const TYPE_ESSAY = 'essay';
-    const TYPE_ASSIGNMENT = 'assignment';
-
-    // Relationships
-    public function subject()
+    public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
     }
 
-    public function teacher()
+    public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    public function class()
+    public function class(): BelongsTo
     {
-        return $this->belongsTo(ClassModel::class, 'class_id');
+        return $this->belongsTo(ClassModel::class);
     }
 
-    public function academicYear()
+    public function academicYear(): BelongsTo
     {
-        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
+        return $this->belongsTo(AcademicYear::class);
     }
 
-    public function submissions()
+    public function submissions(): HasMany
     {
         return $this->hasMany(Submission::class);
     }
 
-    // Scopes
-    public function scopeHomework($query)
+    public function files(): MorphMany
     {
-        return $query->where('assignment_type', self::TYPE_HOMEWORK);
-    }
-
-    public function scopeProject($query)
-    {
-        return $query->where('assignment_type', self::TYPE_PROJECT);
-    }
-
-    public function scopeQuiz($query)
-    {
-        return $query->where('assignment_type', self::TYPE_QUIZ);
-    }
-
-    public function scopeExam($query)
-    {
-        return $query->where('assignment_type', self::TYPE_EXAM);
-    }
-
-    public function scopePresentation($query)
-    {
-        return $query->where('assignment_type', self::TYPE_PRESENTATION);
-    }
-
-    public function scopeEssay($query)
-    {
-        return $query->where('assignment_type', self::TYPE_ESSAY);
-    }
-
-    public function scopeAssignment($query)
-    {
-        return $query->where('assignment_type', self::TYPE_ASSIGNMENT);
+        return $this->morphMany('App\Models\File', 'fileable');
     }
 
     public function scopePublished($query)
@@ -123,16 +87,6 @@ class Assignment extends Model
     public function scopeUnpublished($query)
     {
         return $query->where('is_published', false);
-    }
-
-    public function scopeAllowLateSubmission($query)
-    {
-        return $query->where('allow_late_submission', true);
-    }
-
-    public function scopeDisallowLateSubmission($query)
-    {
-        return $query->where('allow_late_submission', false);
     }
 
     public function scopeForClass($query, $classId)
@@ -155,142 +109,262 @@ class Assignment extends Model
         return $query->where('academic_year_id', $academicYearId);
     }
 
+    public function scopeAssignmentType($query, $assignmentType)
+    {
+        return $query->where('assignment_type', $assignmentType);
+    }
+
+    public function scopeDateRange($query, $startDate, $endDate)
+    {
+        return $query->whereBetween('due_date', [$startDate, $endDate]);
+    }
+
     public function scopeUpcoming($query)
     {
-        return $query->where('due_date', '>', now())
-                    ->where('is_published', true);
+        return $query->where('due_date', '>', now())->published();
     }
 
     public function scopeOverdue($query)
     {
-        return $query->where('due_date', '<', now())
-                    ->where('is_published', true);
+        return $query->where('due_date', '<', now())->published();
     }
 
     public function scopeActive($query)
     {
-        return $query->where('is_published', true)
-                    ->where('due_date', '>=', now());
+        return $query->where('due_date', '>=', now())->published();
     }
 
-    // Accessors
-    public function getIsLateSubmissionAllowedAttribute()
+    public function scopeSearch($query, $keyword)
     {
-        return $this->allow_late_submission;
+        return $query->where(function ($q) use ($keyword) {
+            $q->where('title', 'like', '%' . $keyword . '%')
+              ->orWhere('description', 'like', '%' . $keyword . '%')
+              ->orWhere('instructions', 'like', '%' . $keyword . '%')
+              ->orWhere('assignment_type', 'like', '%' . $keyword . '%');
+        });
     }
 
-    public function getHasFileAttribute()
+    /**
+     * Get the assignment type name in a more readable format
+     */
+    public function getAssignmentTypeNameAttribute()
     {
-        return !empty($this->file_path) && !empty($this->file_name);
+        $types = [
+            'homework' => 'Homework',
+            'project' => 'Project',
+            'quiz' => 'Quiz',
+            'essay' => 'Essay',
+            'presentation' => 'Presentation',
+            'lab' => 'Lab Report',
+            'other' => 'Other'
+        ];
+
+        return $types[$this->assignment_type] ?? ucfirst($this->assignment_type);
     }
 
-    public function getSubmissionWindowAttribute()
+    /**
+     * Check if the assignment is currently available for submission
+     */
+    public function getIsAvailableForSubmissionAttribute()
     {
-        if (!$this->submission_start && !$this->submission_end) {
-            return 'No submission window specified';
-        }
-
-        $start = $this->submission_start ? $this->submission_start->format('d M Y H:i') : 'Immediately';
-        $end = $this->submission_end ? $this->submission_end->format('d M Y H:i') : 'Until due date';
-
-        return "From {$start} to {$end}";
+        $now = now();
+        return $this->is_published &&
+               (!$this->submission_start || $now >= $this->submission_start) &&
+               (!$this->submission_end || $now <= $this->submission_end);
     }
 
+    /**
+     * Check if the assignment is overdue
+     */
     public function getIsOverdueAttribute()
     {
-        return $this->due_date && $this->due_date->isPast() && $this->is_published;
+        return $this->due_date < now();
     }
 
-    public function getDaysUntilDueAttribute()
+    /**
+     * Check if the assignment is upcoming
+     */
+    public function getIsUpcomingAttribute()
     {
-        if (!$this->due_date) {
-            return null;
-        }
-
-        return now()->diffInDays($this->due_date, false);
+        return $this->due_date > now();
     }
 
-    public function getLatePenaltyAttribute()
+    /**
+     * Check if late submission is allowed
+     */
+    public function getAllowsLateSubmissionAttribute()
     {
-        if (!$this->allow_late_submission || !$this->late_penalty_percent) {
+        return $this->allow_late_submission && $this->is_overdue;
+    }
+
+    /**
+     * Get the late penalty amount
+     */
+    public function getLatePenaltyAmountAttribute()
+    {
+        if (!$this->max_score || !$this->late_penalty_percent) {
             return 0;
         }
 
-        return $this->late_penalty_percent;
+        return round(($this->max_score * $this->late_penalty_percent) / 100, 2);
     }
 
-    public function getAssignmentTypeLabelAttribute()
+    /**
+     * Get the submission status for a specific student
+     */
+    public function getSubmissionStatusForStudent($studentId)
     {
-        return self::getAssignmentTypes()[$this->assignment_type] ?? $this->assignment_type;
+        $submission = $this->submissions()->where('student_id', $studentId)->first();
+
+        if (!$submission) {
+            return $this->is_available_for_submission ? 'not_submitted' : 'not_available';
+        }
+
+        return $submission->status;
     }
 
-    public function getFormattedDueDateAttribute()
-    {
-        return $this->due_date ? $this->due_date->format('d M Y H:i') : 'No due date';
-    }
-
-    public function getFormattedSubmissionStartAttribute()
-    {
-        return $this->submission_start ? $this->submission_start->format('d M Y H:i') : 'Immediately';
-    }
-
-    public function getFormattedSubmissionEndAttribute()
-    {
-        return $this->submission_end ? $this->submission_end->format('d M Y H:i') : 'Until due date';
-    }
-
-    // Mutators
-    public function setAssignmentTypeAttribute($value)
-    {
-        $this->attributes['assignment_type'] = strtolower($value);
-    }
-
-    public function setDueDateAttribute($value)
-    {
-        $this->attributes['due_date'] = $value ? \Carbon\Carbon::parse($value) : null;
-    }
-
-    public function setSubmissionStartAttribute($value)
-    {
-        $this->attributes['submission_start'] = $value ? \Carbon\Carbon::parse($value) : null;
-    }
-
-    public function setSubmissionEndAttribute($value)
-    {
-        $this->attributes['submission_end'] = $value ? \Carbon\Carbon::parse($value) : null;
-    }
-
-    // Helper methods
-    public static function getAssignmentTypes()
-    {
-        return [
-            self::TYPE_HOMEWORK => 'Homework',
-            self::TYPE_PROJECT => 'Project',
-            self::TYPE_QUIZ => 'Quiz',
-            self::TYPE_EXAM => 'Exam',
-            self::TYPE_PRESENTATION => 'Presentation',
-            self::TYPE_ESSAY => 'Essay',
-            self::TYPE_ASSIGNMENT => 'Assignment',
-        ];
-    }
-
+    /**
+     * Get the number of submissions
+     */
     public function getSubmissionCountAttribute()
     {
         return $this->submissions()->count();
     }
 
+    /**
+     * Get the number of graded submissions
+     */
     public function getGradedSubmissionCountAttribute()
     {
         return $this->submissions()->where('status', 'graded')->count();
     }
 
+    /**
+     * Get the average score of submissions
+     */
     public function getAverageScoreAttribute()
     {
-        $gradedSubmissions = $this->submissions()->whereNotNull('score')->get();
-        if ($gradedSubmissions->isEmpty()) {
+        $scores = $this->submissions()->whereNotNull('score')->pluck('score');
+        if ($scores->isEmpty()) {
+            return null;
+        }
+
+        return round($scores->avg(), 2);
+    }
+
+    /**
+     * Get the submission rate
+     */
+    public function getSubmissionRateAttribute()
+    {
+        $totalStudents = $this->class->current_student_count;
+        if ($totalStudents === 0) {
             return 0;
         }
 
-        return $gradedSubmissions->avg('score');
+        return round(($this->submission_count / $totalStudents) * 100, 2);
+    }
+
+    /**
+     * Get the formatted due date
+     */
+    public function getFormattedDueDateAttribute()
+    {
+        return $this->due_date->format('d M Y H:i');
+    }
+
+    /**
+     * Get the submission time window
+     */
+    public function getSubmissionTimeWindowAttribute()
+    {
+        if ($this->submission_start && $this->submission_end) {
+            return $this->submission_start->format('d M Y H:i') . ' - ' . $this->submission_end->format('d M Y H:i');
+        } elseif ($this->submission_start) {
+            return $this->submission_start->format('d M Y H:i') . ' - Open';
+        } elseif ($this->submission_end) {
+            return 'Open - ' . $this->submission_end->format('d M Y H:i');
+        }
+        return 'Open';
+    }
+
+    /**
+     * Get the file URL if file exists
+     */
+    public function getFileUrlAttribute()
+    {
+        if ($this->file_path) {
+            return asset('storage/' . $this->file_path);
+        }
+        return null;
+    }
+
+    /**
+     * Scope to get assignments with files
+     */
+    public function scopeWithFiles($query)
+    {
+        return $query->whereNotNull('file_path');
+    }
+
+    /**
+     * Scope to get assignments without files
+     */
+    public function scopeWithoutFiles($query)
+    {
+        return $query->whereNull('file_path');
+    }
+
+    /**
+     * Get the class information
+     */
+    public function getClassInfoAttribute()
+    {
+        return $this->class;
+    }
+
+    /**
+     * Get the subject information
+     */
+    public function getSubjectInfoAttribute()
+    {
+        return $this->subject;
+    }
+
+    /**
+     * Get the teacher information
+     */
+    public function getTeacherInfoAttribute()
+    {
+        return $this->teacher;
+    }
+
+    /**
+     * Get the academic year information
+     */
+    public function getAcademicYearInfoAttribute()
+    {
+        return $this->academicYear;
+    }
+
+    /**
+     * Check if the assignment has a file attachment
+     */
+    public function getHasFileAttribute()
+    {
+        return !is_null($this->file_path);
+    }
+
+    /**
+     * Get the time remaining until due date
+     */
+    public function getTimeRemainingAttribute()
+    {
+        if ($this->is_overdue) {
+            return 'Overdue';
+        }
+
+        $diff = now()->diff($this->due_date);
+        return $diff->days . ' days ' . $diff->h . ' hours';
     }
 }

@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Schedule extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'schedules';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'class_id',
@@ -22,39 +26,36 @@ class Schedule extends Model
         'notes',
         'is_active',
         'academic_year_id',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
         'is_active' => 'boolean',
+        'start_time' => 'datetime',
+        'end_time' => 'datetime'
     ];
 
-    // Relationships
-    public function class()
+    public function class(): BelongsTo
     {
-        return $this->belongsTo(ClassModel::class, 'class_id');
+        return $this->belongsTo(ClassModel::class);
     }
 
-    public function subject()
+    public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
     }
 
-    public function teacher()
+    public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    public function academicYear()
+    public function academicYear(): BelongsTo
     {
-        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
+        return $this->belongsTo(AcademicYear::class);
     }
 
-    // Scopes
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -65,25 +66,25 @@ class Schedule extends Model
         return $query->where('is_active', false);
     }
 
-    public function scopeForDay($query, $day)
+    public function scopeDayOfWeek($query, $day)
     {
         return $query->where('day_of_week', $day);
     }
 
-    public function scopeForTime($query, $startTime, $endTime)
+    public function scopeForDay($query, $day)
     {
-        return $query->where('start_time', $startTime)
-                    ->where('end_time', $endTime);
-    }
+        $days = [
+            'monday' => 'Monday',
+            'tuesday' => 'Tuesday',
+            'wednesday' => 'Wednesday',
+            'thursday' => 'Thursday',
+            'friday' => 'Friday',
+            'saturday' => 'Saturday',
+            'sunday' => 'Sunday'
+        ];
 
-    public function scopeForAcademicYear($query, $academicYearId)
-    {
-        return $query->where('academic_year_id', $academicYearId);
-    }
-
-    public function scopeForClass($query, $classId)
-    {
-        return $query->where('class_id', $classId);
+        $dayName = $days[strtolower($day)] ?? $day;
+        return $query->where('day_of_week', $dayName);
     }
 
     public function scopeForTeacher($query, $teacherId)
@@ -91,29 +92,142 @@ class Schedule extends Model
         return $query->where('teacher_id', $teacherId);
     }
 
-    // Accessors
+    public function scopeForClass($query, $classId)
+    {
+        return $query->where('class_id', $classId);
+    }
+
+    public function scopeForSubject($query, $subjectId)
+    {
+        return $query->where('subject_id', $subjectId);
+    }
+
+    public function scopeForAcademicYear($query, $academicYearId)
+    {
+        return $query->where('academic_year_id', $academicYearId);
+    }
+
+    public function scopeTimeRange($query, $startTime, $endTime)
+    {
+        return $query->where(function ($q) use ($startTime, $endTime) {
+            $q->whereBetween('start_time', [$startTime, $endTime])
+              ->orWhereBetween('end_time', [$startTime, $endTime])
+              ->orWhere(function ($subQuery) use ($startTime, $endTime) {
+                  $subQuery->where('start_time', '<=', $startTime)
+                           ->where('end_time', '>=', $endTime);
+              });
+        });
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        return $query->where(function ($q) use ($keyword) {
+            $q->whereHas('class', function ($classQuery) use ($keyword) {
+                $classQuery->where('name', 'like', '%' . $keyword . '%')
+                          ->orWhere('class_code', 'like', '%' . $keyword . '%');
+            })->orWhereHas('subject', function ($subjectQuery) use ($keyword) {
+                $subjectQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('code', 'like', '%' . $keyword . '%');
+            })->orWhereHas('teacher', function ($teacherQuery) use ($keyword) {
+                $teacherQuery->where('name', 'like', '%' . $keyword . '%');
+            })->orWhere('day_of_week', 'like', '%' . $keyword . '%')
+              ->orWhere('room', 'like', '%' . $keyword . '%')
+              ->orWhere('notes', 'like', '%' . $keyword . '%');
+        });
+    }
+
+    /**
+     * Get the day name in a more readable format
+     */
+    public function getDayNameAttribute()
+    {
+        return $this->day_of_week;
+    }
+
+    /**
+     * Get the formatted time range
+     */
+    public function getTimeRangeAttribute()
+    {
+        return $this->start_time->format('H:i') . ' - ' . $this->end_time->format('H:i');
+    }
+
+    /**
+     * Get the duration in minutes
+     */
     public function getDurationAttribute()
     {
-        $start = \Carbon\Carbon::parse($this->start_time);
-        $end = \Carbon\Carbon::parse($this->end_time);
-        return $start->diffInMinutes($end);
+        return $this->start_time->diffInMinutes($this->end_time);
     }
 
-    public function getFormattedTimeAttribute()
+    /**
+     * Check if the schedule is currently happening (based on current day and time)
+     */
+    public function getIsHappeningNowAttribute()
     {
-        $start = \Carbon\Carbon::parse($this->start_time)->format('H:i');
-        $end = \Carbon\Carbon::parse($this->end_time)->format('H:i');
-        return $start . ' - ' . $end;
+        $now = now();
+        $today = $now->format('l'); // Day name (Monday, Tuesday, etc.)
+        $currentTime = $now->format('H:i:s');
+
+        return $this->day_of_week === $today &&
+               $currentTime >= $this->start_time->format('H:i:s') &&
+               $currentTime <= $this->end_time->format('H:i:s');
     }
 
-    // Mutators
-    public function setStartTimeAttribute($value)
+    /**
+     * Check if the schedule is for today
+     */
+    public function getIsTodayAttribute()
     {
-        $this->attributes['start_time'] = \Carbon\Carbon::parse($value)->format('H:i:s');
+        return $this->day_of_week === now()->format('l');
     }
 
-    public function setEndTimeAttribute($value)
+    /**
+     * Get the next occurrence of this schedule
+     */
+    public function getNextOccurrenceAttribute()
     {
-        $this->attributes['end_time'] = \Carbon\Carbon::parse($value)->format('H:i:s');
+        $today = now();
+        $currentDayOfWeek = strtolower($today->format('l'));
+
+        $daysOfWeek = [
+            'monday' => 0,
+            'tuesday' => 1,
+            'wednesday' => 2,
+            'thursday' => 3,
+            'friday' => 4,
+            'saturday' => 5,
+            'sunday' => 6
+        ];
+
+        $scheduleDayOfWeek = strtolower($this->day_of_week);
+        $currentDayIndex = $daysOfWeek[$currentDayOfWeek];
+        $scheduleDayIndex = $daysOfWeek[$scheduleDayOfWeek];
+
+        // If the schedule is for today and the time has passed, return next week
+        if ($scheduleDayIndex === $currentDayIndex &&
+            now()->format('H:i:s') > $this->start_time->format('H:i:s')) {
+            return $this->start_time->addWeek();
+        }
+
+        // Calculate days until next occurrence
+        $daysToAdd = ($scheduleDayIndex - $currentDayIndex + 7) % 7;
+        if ($daysToAdd === 0) {
+            $daysToAdd = 7; // If it's the same day, schedule for next week
+        }
+
+        return $this->start_time->addDays($daysToAdd);
+    }
+
+    /**
+     * Scope to get schedules for a specific time slot
+     */
+    public function scopeForTimeSlot($query, $day, $startTime, $endTime)
+    {
+        return $query->where('day_of_week', $day)
+            ->where(function ($q) use ($startTime, $endTime) {
+                $q->whereTime('start_time', '<=', $endTime)
+                  ->whereTime('end_time', '>=', $startTime);
+            });
     }
 }

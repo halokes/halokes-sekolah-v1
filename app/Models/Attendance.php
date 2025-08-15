@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Attendance extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'attendances';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'enrollment_id',
@@ -20,10 +25,9 @@ class Attendance extends Model
         'check_in_time',
         'check_out_time',
         'attendance_type',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
         'attendance_date' => 'date',
@@ -31,57 +35,78 @@ class Attendance extends Model
         'check_out_time' => 'datetime',
     ];
 
-    // Constants
-    const STATUS_PRESENT = 'present';
-    const STATUS_ABSENT = 'absent';
-    const STATUS_LATE = 'late';
-    const STATUS_EXCUSE = 'excuse';
-    const STATUS_SICK = 'sick';
-
-    const TYPE_DAILY = 'daily';
-    const TYPE_WEEKLY = 'weekly';
-    const TYPE_MONTHLY = 'monthly';
-
-    // Relationships
-    public function enrollment()
+    public function enrollment(): BelongsTo
     {
         return $this->belongsTo(Enrollment::class);
     }
 
-    public function teacher()
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'enrollment_id', 'enrollment_id');
+    }
+
+    public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    public function student()
-    {
-        return $this->hasOneThrough(User::class, Enrollment::class, 'id', 'id', 'enrollment_id', 'student_id');
-    }
-
-    // Scopes
     public function scopePresent($query)
     {
-        return $query->where('status', self::STATUS_PRESENT);
+        return $query->where('status', 'present');
     }
 
     public function scopeAbsent($query)
     {
-        return $query->where('status', self::STATUS_ABSENT);
+        return $query->where('status', 'absent');
     }
 
     public function scopeLate($query)
     {
-        return $query->where('status', self::STATUS_LATE);
+        return $query->where('status', 'late');
     }
 
     public function scopeExcuse($query)
     {
-        return $query->where('status', self::STATUS_EXCUSE);
+        return $query->where('status', 'excuse');
     }
 
     public function scopeSick($query)
     {
-        return $query->where('status', self::STATUS_SICK);
+        return $query->where('status', 'sick');
+    }
+
+    public function scopeDaily($query)
+    {
+        return $query->where('attendance_type', 'daily');
+    }
+
+    public function scopeWeekly($query)
+    {
+        return $query->where('attendance_type', 'weekly');
+    }
+
+    public function scopeMonthly($query)
+    {
+        return $query->where('attendance_type', 'monthly');
+    }
+
+    public function scopeForStudent($query, $studentId)
+    {
+        return $query->whereHas('enrollment', function ($enrollmentQuery) use ($studentId) {
+            $enrollmentQuery->where('student_id', $studentId);
+        });
+    }
+
+    public function scopeForClass($query, $classId)
+    {
+        return $query->whereHas('enrollment.class', function ($classQuery) use ($classId) {
+            $classQuery->where('id', $classId);
+        });
+    }
+
+    public function scopeForTeacher($query, $teacherId)
+    {
+        return $query->where('teacher_id', $teacherId);
     }
 
     public function scopeForDate($query, $date)
@@ -89,107 +114,166 @@ class Attendance extends Model
         return $query->where('attendance_date', $date);
     }
 
-    public function scopeForDateRange($query, $startDate, $endDate)
+    public function scopeDateRange($query, $startDate, $endDate)
     {
         return $query->whereBetween('attendance_date', [$startDate, $endDate]);
     }
 
-    public function scopeForStudent($query, $studentId)
+    public function scopeSearch($query, $keyword)
     {
-        return $query->whereHas('enrollment', function ($q) use ($studentId) {
-            $q->where('student_id', $studentId);
+        return $query->where(function ($q) use ($keyword) {
+            $q->whereHas('enrollment.student', function ($studentQuery) use ($keyword) {
+                $studentQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('email', 'like', '%' . $keyword . '%');
+            })->orWhereHas('enrollment.class', function ($classQuery) use ($keyword) {
+                $classQuery->where('name', 'like', '%' . $keyword . '%')
+                          ->orWhere('class_code', 'like', '%' . $keyword . '%');
+            })->orWhere('status', 'like', '%' . $keyword . '%')
+              ->orWhere('notes', 'like', '%' . $keyword . '%');
         });
     }
 
-    public function scopeForClass($query, $classId)
+    /**
+     * Get the status name in a more readable format
+     */
+    public function getStatusNameAttribute()
     {
-        return $query->whereHas('enrollment', function ($q) use ($classId) {
-            $q->where('class_id', $classId);
-        });
+        $statuses = [
+            'present' => 'Present',
+            'absent' => 'Absent',
+            'late' => 'Late',
+            'excuse' => 'Excuse',
+            'sick' => 'Sick'
+        ];
+
+        return $statuses[$this->status] ?? ucfirst($this->status);
     }
 
-    public function scopeForAcademicYear($query, $academicYearId)
+    /**
+     * Get the attendance type name in a more readable format
+     */
+    public function getAttendanceTypeNameAttribute()
     {
-        return $query->whereHas('enrollment', function ($q) use ($academicYearId) {
-            $q->where('academic_year_id', $academicYearId);
-        });
+        $types = [
+            'daily' => 'Daily',
+            'weekly' => 'Weekly',
+            'monthly' => 'Monthly'
+        ];
+
+        return $types[$this->attendance_type] ?? ucfirst($this->attendance_type);
     }
 
-    public function scopeDaily($query)
+    /**
+     * Check if attendance is for today
+     */
+    public function getIsTodayAttribute()
     {
-        return $query->where('attendance_type', self::TYPE_DAILY);
+        return $this->attendance_date->isToday();
     }
 
-    public function scopeWeekly($query)
-    {
-        return $query->where('attendance_type', self::TYPE_WEEKLY);
-    }
-
-    public function scopeMonthly($query)
-    {
-        return $query->where('attendance_type', self::TYPE_MONTHLY);
-    }
-
-    // Accessors
-    public function getIsPresentAttribute()
-    {
-        return $this->status === self::STATUS_PRESENT;
-    }
-
-    public function getIsAbsentAttribute()
-    {
-        return $this->status === self::STATUS_ABSENT;
-    }
-
+    /**
+     * Check if student was late
+     */
     public function getIsLateAttribute()
     {
-        return $this->status === self::STATUS_LATE;
+        return $this->status === 'late';
     }
 
-    public function getIsExcuseAttribute()
+    /**
+     * Check if student was absent
+     */
+    public function getIsAbsentAttribute()
     {
-        return $this->status === self::STATUS_EXCUSE;
+        return in_array($this->status, ['absent', 'sick']);
     }
 
-    public function getIsSickAttribute()
-    {
-        return $this->status === self::STATUS_SICK;
-    }
-
+    /**
+     * Get the duration in minutes (if check-in and check-out are recorded)
+     */
     public function getDurationAttribute()
     {
-        if (!$this->check_in_time || !$this->check_out_time) {
-            return null;
+        if ($this->check_in_time && $this->check_out_time) {
+            return $this->check_in_time->diffInMinutes($this->check_out_time);
         }
-
-        $start = \Carbon\Carbon::parse($this->check_in_time);
-        $end = \Carbon\Carbon::parse($this->check_out_time);
-        return $start->diffInMinutes($end);
+        return null;
     }
 
-    public function getFormattedCheckInTimeAttribute()
+    /**
+     * Get the formatted time range
+     */
+    public function getTimeRangeAttribute()
     {
-        return $this->check_in_time ? \Carbon\Carbon::parse($this->check_in_time)->format('H:i') : '-';
+        if ($this->check_in_time && $this->check_out_time) {
+            return $this->check_in_time->format('H:i') . ' - ' . $this->check_out_time->format('H:i');
+        } elseif ($this->check_in_time) {
+            return $this->check_in_time->format('H:i') . ' - ';
+        }
+        return '';
     }
 
-    public function getFormattedCheckOutTimeAttribute()
+    /**
+     * Scope to get attendance records by status
+     */
+    public function scopeWithStatus($query, $status)
     {
-        return $this->check_out_time ? \Carbon\Carbon::parse($this->check_out_time)->format('H:i') : '-';
+        return $query->where('status', $status);
     }
 
-    // Mutators
-    public function setStatusAttribute($value)
+    /**
+     * Scope to get attendance records by attendance type
+     */
+    public function scopeWithType($query, $type)
     {
-        $this->attributes['status'] = strtolower($value);
+        return $query->where('attendance_type', $type);
     }
 
-    public function setCheckInTimeAttribute($value)
+    /**
+     * Scope to get attendance records with check-in and check-out times
+     */
+    public function scopeWithCheckInOut($query)
     {
-        $this->attributes['check_in_time'] = $value ? \Carbon\Carbon::parse($value) : null;
+        return $query->whereNotNull('check_in_time')->whereNotNull('check_out_time');
     }
 
-    public function setCheckOutTimeAttribute($value)
+    /**
+     * Scope to get attendance records without check-in and check-out times
+     */
+    public function scopeWithoutCheckInOut($query)
     {
-        $this->attributes['check_out_time'] = $value ? \Carbon\Carbon::parse($value) : null;
+        return $query->where(function ($q) {
+            $q->whereNull('check_in_time')->orWhereNull('check_out_time');
+        });
+    }
+
+    /**
+     * Get the student's full information
+     */
+    public function getStudentInfoAttribute()
+    {
+        return $this->enrollment->student_info;
+    }
+
+    /**
+     * Get the class information
+     */
+    public function getClassInfoAttribute()
+    {
+        return $this->enrollment->class;
+    }
+
+    /**
+     * Get the week number of the attendance date
+     */
+    public function getWeekNumberAttribute()
+    {
+        return $this->attendance_date->weekOfYear;
+    }
+
+    /**
+     * Get the month name of the attendance date
+     */
+    public function getMonthNameAttribute()
+    {
+        return $this->attendance_date->format('F');
     }
 }

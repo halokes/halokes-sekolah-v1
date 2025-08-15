@@ -2,16 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ClassModel extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'classes';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'name',
@@ -24,71 +28,76 @@ class ClassModel extends Model
         'description',
         'is_active',
         'order',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
-        'max_students' => 'integer',
         'is_active' => 'boolean',
-        'order' => 'integer',
+        'max_students' => 'integer',
+        'order' => 'integer'
     ];
 
-    // Relationships
-    public function school()
+    public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
     }
 
-    public function level()
+    public function level(): BelongsTo
     {
         return $this->belongsTo(SchoolLevel::class, 'level_id');
     }
 
-    public function academicYear()
+    public function academicYear(): BelongsTo
     {
-        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
+        return $this->belongsTo(AcademicYear::class);
     }
 
-    public function homeroomTeacher()
+    public function homeroomTeacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'homeroom_teacher_id');
     }
 
-    public function students()
-    {
-        return $this->hasManyThrough(User::class, Enrollment::class, 'class_id', 'id', 'id', 'student_id');
-    }
-
-    public function enrollments()
+    public function students(): HasMany
     {
         return $this->hasMany(Enrollment::class);
     }
 
-    public function schedules()
+    public function schedules(): HasMany
     {
         return $this->hasMany(Schedule::class);
     }
 
-    public function subjects()
+    public function enrollments(): HasMany
     {
-        return $this->belongsToMany(Subject::class, 'teacher_subjects', 'class_id', 'subject_id')
-            ->withPivot(['teacher_id', 'teaching_role', 'notes'])
-            ->withTimestamps();
+        return $this->hasMany(Enrollment::class);
     }
 
-    public function assignments()
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function grades(): HasMany
+    {
+        return $this->hasMany(Grade::class);
+    }
+
+    public function assignments(): HasMany
     {
         return $this->hasMany(Assignment::class);
     }
 
-    public function teacherSubjects()
+    public function teacherSubjects(): HasMany
     {
         return $this->hasMany(TeacherSubject::class);
     }
 
-    // Scopes
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(Announcement::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -97,6 +106,25 @@ class ClassModel extends Model
     public function scopeInactive($query)
     {
         return $query->where('is_active', false);
+    }
+
+    public function scopeClassCode($query, $classCode)
+    {
+        return $query->where('class_code', $classCode);
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        return $query->where(function ($q) use ($keyword) {
+            $q->where('name', 'like', '%' . $keyword . '%')
+              ->orWhere('class_code', 'like', '%' . $keyword . '%')
+              ->orWhere('description', 'like', '%' . $keyword . '%');
+        });
+    }
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('order', 'asc');
     }
 
     public function scopeForSchool($query, $schoolId)
@@ -114,19 +142,44 @@ class ClassModel extends Model
         return $query->where('level_id', $levelId);
     }
 
-    // Accessors
-    public function getStudentCountAttribute()
+    /**
+     * Get the current student count
+     */
+    public function getCurrentStudentCountAttribute()
     {
-        return $this->enrollments()->where('status', 'active')->count();
+        return $this->students()->where('status', 'active')->count();
     }
 
-    public function getIsFullAttribute()
+    /**
+     * Check if the class has available slots
+     */
+    public function getHasAvailableSlotsAttribute()
     {
-        return $this->max_students && $this->student_count >= $this->max_students;
+        if (!$this->max_students) {
+            return true; // No limit
+        }
+        return $this->current_student_count < $this->max_students;
     }
 
-    public function getHomeroomTeacherNameAttribute()
+    /**
+     * Get available slots count
+     */
+    public function getAvailableSlotsAttribute()
     {
-        return $this->homeroomTeacher ? $this->homeroomTeacher->name : 'Not assigned';
+        if (!$this->max_students) {
+            return null; // No limit
+        }
+        return max(0, $this->max_students - $this->current_student_count);
+    }
+
+    /**
+     * Scope to get classes with available slots
+     */
+    public function scopeWithAvailableSlots($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('max_students')
+              ->orWhereRaw('max_students > (SELECT COUNT(*) FROM enrollments WHERE enrollments.class_id = classes.id AND enrollments.status = "active")');
+        });
     }
 }

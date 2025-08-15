@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Grade extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'grades';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'enrollment_id',
@@ -24,99 +29,89 @@ class Grade extends Model
         'assessment_date',
         'semester',
         'academic_year_id',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
-        'weight' => 'decimal:2',
         'assessment_date' => 'date',
+        'weight' => 'decimal:2',
         'semester' => 'integer',
+        'score' => 'decimal:2',
     ];
 
-    // Constants
-    const ASSESSMENT_DAILY = 'daily';
-    const ASSESSMENT_QUIZ = 'quiz';
-    const ASSESSMENT_MIDTERM = 'midterm';
-    const ASSESSMENT_FINAL = 'final';
-    const ASSESSMENT_PROJECT = 'project';
-    const ASSESSMENT_ASSIGNMENT = 'assignment';
-
-    // Relationships
-    public function enrollment()
+    public function enrollment(): BelongsTo
     {
         return $this->belongsTo(Enrollment::class);
     }
 
-    public function subject()
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'enrollment_id', 'enrollment_id');
+    }
+
+    public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
     }
 
-    public function teacher()
+    public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    public function academicYear()
+    public function academicYear(): BelongsTo
     {
-        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
+        return $this->belongsTo(AcademicYear::class);
     }
 
-    public function student()
-    {
-        return $this->hasOneThrough(User::class, Enrollment::class, 'id', 'id', 'enrollment_id', 'student_id');
-    }
-
-    // Scopes
     public function scopeDaily($query)
     {
-        return $query->where('assessment_type', self::ASSESSMENT_DAILY);
+        return $query->where('assessment_type', 'daily');
     }
 
     public function scopeQuiz($query)
     {
-        return $query->where('assessment_type', self::ASSESSMENT_QUIZ);
+        return $query->where('assessment_type', 'quiz');
     }
 
     public function scopeMidterm($query)
     {
-        return $query->where('assessment_type', self::ASSESSMENT_MIDTERM);
+        return $query->where('assessment_type', 'midterm');
     }
 
     public function scopeFinal($query)
     {
-        return $query->where('assessment_type', self::ASSESSMENT_FINAL);
+        return $query->where('assessment_type', 'final');
     }
 
     public function scopeProject($query)
     {
-        return $query->where('assessment_type', self::ASSESSMENT_PROJECT);
-    }
-
-    public function scopeAssignment($query)
-    {
-        return $query->where('assessment_type', self::ASSESSMENT_ASSIGNMENT);
+        return $query->where('assessment_type', 'project');
     }
 
     public function scopeForStudent($query, $studentId)
     {
-        return $query->whereHas('enrollment', function ($q) use ($studentId) {
-            $q->where('student_id', $studentId);
+        return $query->whereHas('enrollment', function ($enrollmentQuery) use ($studentId) {
+            $enrollmentQuery->where('student_id', $studentId);
         });
     }
 
     public function scopeForClass($query, $classId)
     {
-        return $query->whereHas('enrollment', function ($q) use ($classId) {
-            $q->where('class_id', $classId);
+        return $query->whereHas('enrollment.class', function ($classQuery) use ($classId) {
+            $classQuery->where('id', $classId);
         });
     }
 
     public function scopeForSubject($query, $subjectId)
     {
         return $query->where('subject_id', $subjectId);
+    }
+
+    public function scopeForTeacher($query, $teacherId)
+    {
+        return $query->where('teacher_id', $teacherId);
     }
 
     public function scopeForAcademicYear($query, $academicYearId)
@@ -134,83 +129,186 @@ class Grade extends Model
         return $query->where('assessment_type', $assessmentType);
     }
 
-    // Accessors
+    public function scopeDateRange($query, $startDate, $endDate)
+    {
+        return $query->whereBetween('assessment_date', [$startDate, $endDate]);
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        return $query->where(function ($q) use ($keyword) {
+            $q->whereHas('enrollment.student', function ($studentQuery) use ($keyword) {
+                $studentQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('email', 'like', '%' . $keyword . '%');
+            })->orWhereHas('subject', function ($subjectQuery) use ($keyword) {
+                $subjectQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('code', 'like', '%' . $keyword . '%');
+            })->orWhere('assessment_type', 'like', '%' . $keyword . '%')
+              ->orWhere('score', 'like', '%' . $keyword . '%')
+              ->orWhere('grade', 'like', '%' . $keyword . '%')
+              ->orWhere('predikat', 'like', '%' . $keyword . '%')
+              ->orWhere('notes', 'like', '%' . $keyword . '%');
+        });
+    }
+
+    /**
+     * Get the assessment type name in a more readable format
+     */
+    public function getAssessmentTypeNameAttribute()
+    {
+        $types = [
+            'daily' => 'Daily Assessment',
+            'quiz' => 'Quiz',
+            'midterm' => 'Midterm Exam',
+            'final' => 'Final Exam',
+            'project' => 'Project'
+        ];
+
+        return $types[$this->assessment_type] ?? ucfirst($this->assessment_type);
+    }
+
+    /**
+     * Get the letter grade based on score
+     */
+    public function getLetterGradeAttribute()
+    {
+        if (!$this->score) {
+            return '-';
+        }
+
+        if ($this->score >= 90) return 'A';
+        if ($this->score >= 80) return 'B';
+        if ($this->score >= 70) return 'C';
+        if ($this->score >= 60) return 'D';
+        return 'E';
+    }
+
+    /**
+     * Get the predicate based on score (Indonesian grading system)
+     */
+    public function getPredicateAttribute()
+    {
+        if (!$this->score) {
+            return '-';
+        }
+
+        if ($this->score >= 96) return 'Sangat Memuaskan';
+        if ($this->score >= 91) return 'Memuaskan';
+        if ($this->score >= 86) return 'Baik Sekali';
+        if ($this->score >= 81) return 'Baik';
+        if ($this->score >= 76) return 'Cukup Baik';
+        if ($this->score >= 71) return 'Cukup';
+        if ($this->score >= 66) return 'Lebih Dari Cukup';
+        if ($this->score >= 61) return 'Kurang';
+        return 'Sangat Kurang';
+    }
+
+    /**
+     * Check if the grade is for the current semester
+     */
+    public function getIsCurrentSemesterAttribute()
+    {
+        $currentSemester = now()->month <= 6 ? 1 : 2;
+        return $this->semester === $currentSemester;
+    }
+
+    /**
+     * Get the weighted score
+     */
     public function getWeightedScoreAttribute()
     {
-        return $this->score * $this->weight;
+        if (!$this->score || !$this->weight) {
+            return null;
+        }
+
+        return round($this->score * $this->weight, 2);
     }
 
-    public function getIsDailyAttribute()
+    /**
+     * Scope to get grades by score range
+     */
+    public function scopeScoreRange($query, $minScore, $maxScore)
     {
-        return $this->assessment_type === self::ASSESSMENT_DAILY;
+        return $query->whereBetween('score', [$minScore, $maxScore]);
     }
 
-    public function getIsQuizAttribute()
+    /**
+     * Scope to get grades by grade range
+     */
+    public function scopeGradeRange($query, $minGrade, $maxGrade)
     {
-        return $this->assessment_type === self::ASSESSMENT_QUIZ;
+        return $query->whereBetween('grade', [$minGrade, $maxGrade]);
     }
 
-    public function getIsMidtermAttribute()
+    /**
+     * Get the student's full information
+     */
+    public function getStudentInfoAttribute()
     {
-        return $this->assessment_type === self::ASSESSMENT_MIDTERM;
+        return $this->enrollment->student_info;
     }
 
-    public function getIsFinalAttribute()
+    /**
+     * Get the subject information
+     */
+    public function getSubjectInfoAttribute()
     {
-        return $this->assessment_type === self::ASSESSMENT_FINAL;
+        return $this->subject;
     }
 
-    public function getIsProjectAttribute()
+    /**
+     * Get the class information
+     */
+    public function getClassInfoAttribute()
     {
-        return $this->assessment_type === self::ASSESSMENT_PROJECT;
+        return $this->enrollment->class;
     }
 
-    public function getIsAssignmentAttribute()
+    /**
+     * Get the teacher information
+     */
+    public function getTeacherInfoAttribute()
     {
-        return $this->assessment_type === self::ASSESSMENT_ASSIGNMENT;
+        return $this->teacher;
     }
 
-    public function getGradeLabelAttribute()
+    /**
+     * Get the academic year information
+     */
+    public function getAcademicYearInfoAttribute()
     {
-        return $this->grade ? $this->grade . ' (' . $this->predikat . ')' : '-';
+        return $this->academicYear;
     }
 
+    /**
+     * Get the semester name
+     */
+    public function getSemesterNameAttribute()
+    {
+        return $this->semester === 1 ? 'Semester 1' : 'Semester 2';
+    }
+
+    /**
+     * Get the formatted assessment date
+     */
     public function getFormattedAssessmentDateAttribute()
     {
-        return $this->assessment_date ? $this->assessment_date->format('d M Y') : '-';
+        return $this->assessment_date->format('d M Y');
     }
 
-    // Mutators
-    public function setAssessmentTypeAttribute($value)
+    /**
+     * Check if the grade is for a final assessment
+     */
+    public function getIsFinalAssessmentAttribute()
     {
-        $this->attributes['assessment_type'] = strtolower($value);
+        return in_array($this->assessment_type, ['final', 'midterm']);
     }
 
-    public function setScoreAttribute($value)
+    /**
+     * Check if the grade is for a regular assessment
+     */
+    public function getIsRegularAssessmentAttribute()
     {
-        $this->attributes['score'] = $value ? floatval($value) : null;
-    }
-
-    public function setWeightAttribute($value)
-    {
-        $this->attributes['weight'] = $value ? floatval($value) : 1.00;
-    }
-
-    // Helper methods
-    public static function getAssessmentTypes()
-    {
-        return [
-            self::ASSESSMENT_DAILY => 'Daily Assessment',
-            self::ASSESSMENT_QUIZ => 'Quiz',
-            self::ASSESSMENT_MIDTERM => 'Midterm',
-            self::ASSESSMENT_FINAL => 'Final',
-            self::ASSESSMENT_PROJECT => 'Project',
-            self::ASSESSMENT_ASSIGNMENT => 'Assignment',
-        ];
-    }
-
-    public function getAssessmentTypeLabelAttribute()
-    {
-        return self::getAssessmentTypes()[$this->assessment_type] ?? $this->assessment_type;
+        return in_array($this->assessment_type, ['daily', 'quiz', 'project']);
     }
 }

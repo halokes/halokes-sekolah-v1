@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Submission extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'submissions';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'assignment_id',
@@ -27,10 +32,9 @@ class Submission extends Model
         'late_penalty_notes',
         'graded_by',
         'graded_at',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
         'submitted_at' => 'datetime',
@@ -40,47 +44,44 @@ class Submission extends Model
         'days_late' => 'integer',
     ];
 
-    // Constants
-    const STATUS_DRAFT = 'draft';
-    const STATUS_SUBMITTED = 'submitted';
-    const STATUS_GRADED = 'graded';
-    const STATUS_RETURNED = 'returned';
-
-    // Relationships
-    public function assignment()
+    public function assignment(): BelongsTo
     {
         return $this->belongsTo(Assignment::class);
     }
 
-    public function student()
+    public function student(): BelongsTo
     {
         return $this->belongsTo(User::class, 'student_id');
     }
 
-    public function grader()
+    public function gradedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'graded_by');
     }
 
-    // Scopes
-    public function scopeDraft($query)
+    public function files(): MorphMany
     {
-        return $query->where('status', self::STATUS_DRAFT);
+        return $this->morphMany('App\Models\File', 'fileable');
     }
 
     public function scopeSubmitted($query)
     {
-        return $query->where('status', self::STATUS_SUBMITTED);
+        return $query->where('status', 'submitted');
     }
 
     public function scopeGraded($query)
     {
-        return $query->where('status', self::STATUS_GRADED);
+        return $query->where('status', 'graded');
+    }
+
+    public function scopeDraft($query)
+    {
+        return $query->where('status', 'draft');
     }
 
     public function scopeReturned($query)
     {
-        return $query->where('status', self::STATUS_RETURNED);
+        return $query->where('status', 'returned');
     }
 
     public function scopeLate($query)
@@ -103,185 +104,167 @@ class Submission extends Model
         return $query->where('student_id', $studentId);
     }
 
-    public function scopeForClass($query, $classId)
+    public function scopeForGrader($query, $gradedBy)
     {
-        return $query->whereHas('assignment', function ($q) use ($classId) {
-            $q->where('class_id', $classId);
+        return $query->where('graded_by', $gradedBy);
+    }
+
+    public function scopeDateRange($query, $startDate, $endDate)
+    {
+        return $query->whereBetween('submitted_at', [$startDate, $endDate]);
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        return $query->where(function ($q) use ($keyword) {
+            $q->whereHas('assignment', function ($assignmentQuery) use ($keyword) {
+                $assignmentQuery->where('title', 'like', '%' . $keyword . '%')
+                                ->orWhere('description', 'like', '%' . $keyword . '%');
+            })->orWhereHas('student', function ($studentQuery) use ($keyword) {
+                $studentQuery->where('name', 'like', '%' . $keyword . '%')
+                            ->orWhere('email', 'like', '%' . $keyword . '%');
+            })->orWhere('content', 'like', '%' . $keyword . '%')
+              ->orWhere('feedback', 'like', '%' . $keyword . '%')
+              ->orWhere('status', 'like', '%' . $keyword . '%');
         });
     }
 
-    public function scopeForSubject($query, $subjectId)
+    /**
+     * Get the status name in a more readable format
+     */
+    public function getStatusNameAttribute()
     {
-        return $query->whereHas('assignment', function ($q) use ($subjectId) {
-            $q->where('subject_id', $subjectId);
-        });
+        $statuses = [
+            'draft' => 'Draft',
+            'submitted' => 'Submitted',
+            'graded' => 'Graded',
+            'returned' => 'Returned'
+        ];
+
+        return $statuses[$this->status] ?? ucfirst($this->status);
     }
 
-    public function scopeForTeacher($query, $teacherId)
+    /**
+     * Check if the submission is late
+     */
+    public function getIsLateAttribute()
     {
-        return $query->whereHas('assignment', function ($q) use ($teacherId) {
-            $q->where('teacher_id', $teacherId);
-        });
+        return $this->submitted_at > $this->assignment->due_date;
     }
 
-    public function scopeGradedBy($query, $graderId)
-    {
-        return $query->where('graded_by', $graderId);
-    }
-
-    // Accessors
-    public function getIsDraftAttribute()
-    {
-        return $this->status === self::STATUS_DRAFT;
-    }
-
-    public function getIsSubmittedAttribute()
-    {
-        return $this->status === self::STATUS_SUBMITTED;
-    }
-
-    public function getIsGradedAttribute()
-    {
-        return $this->status === self::STATUS_GRADED;
-    }
-
-    public function getIsReturnedAttribute()
-    {
-        return $this->status === self::STATUS_RETURNED;
-    }
-
-    public function getHasFileAttribute()
-    {
-        return !empty($this->file_path) && !empty($this->file_name);
-    }
-
-    public function getHasContentAttribute()
-    {
-        return !empty($this->content);
-    }
-
-    public function getHasFeedbackAttribute()
-    {
-        return !empty($this->feedback);
-    }
-
+    /**
+     * Get the formatted submitted at date
+     */
     public function getFormattedSubmittedAtAttribute()
     {
-        return $this->submitted_at ? $this->submitted_at->format('d M Y H:i') : 'Not submitted';
+        return $this->submitted_at ? $this->submitted_at->format('d M Y H:i') : '-';
     }
 
+    /**
+     * Get the formatted graded at date
+     */
     public function getFormattedGradedAtAttribute()
     {
-        return $this->graded_at ? $this->graded_at->format('d M Y H:i') : 'Not graded';
+        return $this->graded_at ? $this->graded_at->format('d M Y H:i') : '-';
     }
 
-    public function getScorePercentageAttribute()
+    /**
+     * Get the file URL if file exists
+     */
+    public function getFileUrlAttribute()
     {
-        if (!$this->assignment || !$this->assignment->max_score || !$this->score) {
+        if ($this->file_path) {
+            return asset('storage/' . $this->file_path);
+        }
+        return null;
+    }
+
+    /**
+     * Check if the submission has a file attachment
+     */
+    public function getHasFileAttribute()
+    {
+        return !is_null($this->file_path);
+    }
+
+    /**
+     * Get the student's full information
+     */
+    public function getStudentInfoAttribute()
+    {
+        return $this->student;
+    }
+
+    /**
+     * Get the assignment information
+     */
+    public function getAssignmentInfoAttribute()
+    {
+        return $this->assignment;
+    }
+
+    /**
+     * Get the grader's information
+     */
+    public function getGraderInfoAttribute()
+    {
+        return $this->gradedBy;
+    }
+
+    /**
+     * Get the calculated late penalty
+     */
+    public function getCalculatedLatePenaltyAttribute()
+    {
+        if (!$this->is_late || !$this->assignment->late_penalty_percent || !$this->assignment->max_score) {
             return 0;
         }
 
-        return round(($this->score / $this->assignment->max_score) * 100, 2);
+        $penaltyPerDay = ($this->assignment->max_score * $this->assignment->late_penalty_percent) / 100;
+        return round($penaltyPerDay * $this->days_late, 2);
     }
 
-    public function getGradeLabelAttribute()
-    {
-        if (!$this->grade) {
-            return 'No grade';
-        }
-
-        return $this->grade . ($this->score ? ' (' . $this->score . ')' : '');
-    }
-
-    public function getLatePenaltyAppliedAttribute()
-    {
-        return $this->is_late && $this->days_late > 0;
-    }
-
-    public function getStatusLabelAttribute()
-    {
-        $labels = [
-            self::STATUS_DRAFT => 'Draft',
-            self::STATUS_SUBMITTED => 'Submitted',
-            self::STATUS_GRADED => 'Graded',
-            self::STATUS_RETURNED => 'Returned',
-        ];
-
-        return $labels[$this->status] ?? $this->status;
-    }
-
-    // Mutators
-    public function setStatusAttribute($value)
-    {
-        $this->attributes['status'] = strtolower($value);
-    }
-
-    public function setIsLateAttribute($value)
-    {
-        $this->attributes['is_late'] = (bool) $value;
-    }
-
-    public function setSubmittedAtAttribute($value)
-    {
-        $this->attributes['submitted_at'] = $value ? \Carbon\Carbon::parse($value) : null;
-    }
-
-    public function setGradedAtAttribute($value)
-    {
-        $this->attributes['graded_at'] = $value ? \Carbon\Carbon::parse($value) : null;
-    }
-
-    // Helper methods
-    public static function getStatuses()
-    {
-        return [
-            self::STATUS_DRAFT => 'Draft',
-            self::STATUS_SUBMITTED => 'Submitted',
-            self::STATUS_GRADED => 'Graded',
-            self::STATUS_RETURNED => 'Returned',
-        ];
-    }
-
-    public function canBeGraded()
-    {
-        return $this->status === self::STATUS_SUBMITTED && !$this->isGraded;
-    }
-
-    public function canBeSubmitted()
-    {
-        return ($this->hasContent || $this->hasFile) && !$this->isSubmitted;
-    }
-
-    public function calculateLatePenalty()
-    {
-        if (!$this->is_late || !$this->assignment || !$this->assignment->allow_late_submission) {
-            return 0;
-        }
-
-        $penaltyPercent = $this->assignment->late_penalty_percent;
-        $maxScore = $this->assignment->max_score;
-
-        return round(($maxScore * $penaltyPercent / 100) * $this->days_late, 2);
-    }
-
+    /**
+     * Get the final score after penalty
+     */
     public function getFinalScoreAttribute()
     {
         if (!$this->score) {
             return null;
         }
 
-        $penalty = $this->calculateLatePenalty();
-        $finalScore = max(0, $this->score - $penalty);
-
-        return round($finalScore, 2);
+        return max(0, $this->score - $this->calculated_late_penalty);
     }
 
-    public function getFinalScorePercentageAttribute()
+    /**
+     * Get the letter grade based on final score
+     */
+    public function getFinalGradeAttribute()
     {
-        if (!$this->assignment || !$this->assignment->max_score || !$this->final_score) {
-            return 0;
+        if (is_null($this->final_score)) {
+            return '-';
         }
 
-        return round(($this->final_score / $this->assignment->max_score) * 100, 2);
+        if ($this->final_score >= 90) return 'A';
+        if ($this->final_score >= 80) return 'B';
+        if ($this->final_score >= 70) return 'C';
+        if ($this->final_score >= 60) return 'D';
+        return 'E';
+    }
+
+    /**
+     * Scope to get submissions by status
+     */
+    public function scopeWithStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope to get submissions by score range
+     */
+    public function scopeScoreRange($query, $minScore, $maxScore)
+    {
+        return $query->whereBetween('score', [$minScore, $maxScore]);
     }
 }

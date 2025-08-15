@@ -25,6 +25,8 @@ return new class extends Migration
             $table->date('assessment_date');
             $table->integer('semester')->default(1); // 1 or 2
             $table->uuid('academic_year_id');
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

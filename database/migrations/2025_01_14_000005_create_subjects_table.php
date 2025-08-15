@@ -21,6 +21,8 @@ return new class extends Migration
             $table->string('category')->default('academic'); // academic, extracurricular, skill
             $table->boolean('is_active')->default(true);
             $table->integer('order')->default(0);
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

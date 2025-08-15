@@ -30,6 +30,8 @@ return new class extends Migration
             $table->boolean('allow_late_submission')->default(false);
             $table->integer('late_penalty_percent')->default(0);
             $table->uuid('academic_year_id');
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

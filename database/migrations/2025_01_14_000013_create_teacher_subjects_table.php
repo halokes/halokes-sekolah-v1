@@ -20,6 +20,8 @@ return new class extends Migration
             $table->string('teaching_role')->default('regular'); // regular, assistant, substitute
             $table->text('notes')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

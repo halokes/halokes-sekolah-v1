@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Subject extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, SoftDeletes;
+
+    protected $table = 'subjects';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'name',
@@ -20,62 +25,45 @@ class Subject extends Model
         'category',
         'is_active',
         'order',
+        'created_by',
+        'updated_by'
     ];
-
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $casts = [
         'is_active' => 'boolean',
-        'order' => 'integer',
+        'order' => 'integer'
     ];
 
-    // Relationships
-    public function school()
+    public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
     }
 
-    public function level()
+    public function level(): BelongsTo
     {
         return $this->belongsTo(SchoolLevel::class, 'level_id');
     }
 
-    public function schedules()
+    public function schedules(): HasMany
     {
         return $this->hasMany(Schedule::class);
     }
 
-    public function grades()
+    public function grades(): HasMany
     {
         return $this->hasMany(Grade::class);
     }
 
-    public function assignments()
+    public function assignments(): HasMany
     {
         return $this->hasMany(Assignment::class);
     }
 
-    public function teacherSubjects()
+    public function teacherSubjects(): HasMany
     {
         return $this->hasMany(TeacherSubject::class);
     }
 
-    public function teachers()
-    {
-        return $this->belongsToMany(User::class, 'teacher_subjects', 'subject_id', 'teacher_id')
-            ->withPivot(['class_id', 'academic_year_id', 'teaching_role', 'notes'])
-            ->withTimestamps();
-    }
-
-    public function classes()
-    {
-        return $this->belongsToMany(ClassModel::class, 'teacher_subjects', 'subject_id', 'class_id')
-            ->withPivot(['teacher_id', 'academic_year_id', 'teaching_role', 'notes'])
-            ->withTimestamps();
-    }
-
-    // Scopes
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -86,14 +74,14 @@ class Subject extends Model
         return $query->where('is_active', false);
     }
 
-    public function scopeForSchool($query, $schoolId)
+    public function scopeCode($query, $code)
     {
-        return $query->where('school_id', $schoolId);
+        return $query->where('code', $code);
     }
 
-    public function scopeForLevel($query, $levelId)
+    public function scopeCategory($query, $category)
     {
-        return $query->where('level_id', $levelId);
+        return $query->where('category', $category);
     }
 
     public function scopeAcademic($query)
@@ -111,15 +99,86 @@ class Subject extends Model
         return $query->where('category', 'skill');
     }
 
+    public function scopeSearch($query, $keyword)
+    {
+        return $query->where(function ($q) use ($keyword) {
+            $q->where('name', 'like', '%' . $keyword . '%')
+              ->orWhere('code', 'like', '%' . $keyword . '%')
+              ->orWhere('description', 'like', '%' . $keyword . '%');
+        });
+    }
+
     public function scopeOrdered($query)
     {
         return $query->orderBy('order', 'asc');
     }
 
-    // Accessors
-    public function getFullNameAttribute()
+    public function scopeForSchool($query, $schoolId)
     {
-        $levelName = $this->level ? $this->level->name . ' - ' : '';
-        return $levelName . $this->name;
+        return $query->where('school_id', $schoolId);
+    }
+
+    public function scopeForLevel($query, $levelId)
+    {
+        return $query->where('level_id', $levelId);
+    }
+
+    /**
+     * Get the category name in a more readable format
+     */
+    public function getCategoryNameAttribute()
+    {
+        $categories = [
+            'academic' => 'Academic',
+            'extracurricular' => 'Extracurricular',
+            'skill' => 'Skill'
+        ];
+
+        return $categories[$this->category] ?? ucfirst($this->category);
+    }
+
+    /**
+     * Get the number of teachers assigned to this subject
+     */
+    public function getTeacherCountAttribute()
+    {
+        return $this->teacherSubjects()->distinct('teacher_id')->count('teacher_id');
+    }
+
+    /**
+     * Get the number of classes this subject is taught in
+     */
+    public function getClassCountAttribute()
+    {
+        return $this->teacherSubjects()->distinct('class_id')->count('class_id');
+    }
+
+    /**
+     * Get the number of assignments for this subject
+     */
+    public function getAssignmentCountAttribute()
+    {
+        return $this->assignments()->count();
+    }
+
+    /**
+     * Get the average grade for this subject
+     */
+    public function getAverageGradeAttribute()
+    {
+        $grades = $this->grades()->whereNotNull('score')->pluck('score');
+        if ($grades->isEmpty()) {
+            return null;
+        }
+
+        return round($grades->avg(), 2);
+    }
+
+    /**
+     * Scope to get subjects by category
+     */
+    public function scopeByCategory($query, $category)
+    {
+        return $query->where('category', $category);
     }
 }

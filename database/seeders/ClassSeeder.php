@@ -42,6 +42,7 @@ class ClassSeeder extends Seeder
                     $classCode = $classCodes[$index] ?? $level->code . '-' . ($index + 1);
 
                     ClassModel::create([
+                        'id' => \Illuminate\Support\Str::uuid(),
                         'name' => $className,
                         'class_code' => $classCode,
                         'school_id' => $school->id,

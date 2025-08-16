@@ -76,6 +76,7 @@ class SchoolSeeder extends Seeder
 
             if (!$existingYear) {
                 $academicYear = AcademicYear::create([
+                    'id' => \Illuminate\Support\Str::uuid(),
                     'name' => 'Tahun Ajaran ' . $currentYear . '/' . ($currentYear + 1),
                     'year_code' => $yearCode,
                     'start_date' => date('Y-m-d', strtotime($currentYear . '-07-01')),
@@ -94,6 +95,7 @@ class SchoolSeeder extends Seeder
 
             if (!$existingPreviousYear) {
                 AcademicYear::create([
+                    'id' => \Illuminate\Support\Str::uuid(),
                     'name' => 'Tahun Ajaran ' . $previousYear . '/' . $currentYear,
                     'year_code' => $previousYearCode,
                     'start_date' => date('Y-m-d', strtotime($previousYear . '-07-01')),

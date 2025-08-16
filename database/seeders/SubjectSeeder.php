@@ -121,6 +121,7 @@ class SubjectSeeder extends Seeder
             }
 
             Subject::create([
+                'id' => \Illuminate\Support\Str::uuid(),
                 'name' => $subject['name'],
                 'code' => $subject['code'],
                 'description' => 'Mata pelajaran ' . $subject['name'],
